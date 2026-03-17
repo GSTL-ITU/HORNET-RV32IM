@@ -14,7 +14,7 @@ module core_wb(input rst_ni, //active-low reset
                input         data_wb_ack_i,
                input [31:0]  data_wb_dat_i,
                input         data_wb_err_i,
-               input         data_wb_rst_i,
+               input         data_wb_rst_ni,
                input         data_wb_clk_i,
 
                //Wishbone interface for instruction memory
@@ -38,7 +38,7 @@ module core_wb(input rst_ni, //active-low reset
                input [15:0] fast_irq_i,
                output irq_ack_o, //Interrupt acknowledge signal. driven high for one cycle when an external interrupt is handled.
                //Tracer signals
-               output [31:0] tr_mem_data, tr_mem_addr, tr_reg_data, tr_pc, tr_instr, fflags,
+               output [31:0] tr_mem_data, tr_mem_addr, tr_reg_data, tr_pc, tr_instr,
                output [4:0]  tr_reg_addr,
                output [1:0]  tr_mem_len,
                output        tr_valid, tr_load, tr_store, tr_is_float
@@ -96,13 +96,12 @@ core    #(.reset_vector(reset_vector))
         .tr_valid(tr_valid),
         .tr_load(tr_load),
         .tr_store(tr_store),
-        .tr_is_float(tr_is_float),
-        .fflags(fflags));
+        .tr_is_float(tr_is_float));
 
 reg data_cyc;
-always @(posedge data_wb_clk_i or posedge data_wb_rst_i)
+always @(posedge data_wb_clk_i or negedge data_wb_rst_ni)
 begin
-    if(data_wb_rst_i)
+    if(!data_wb_rst_ni)
         data_cyc <= 1'b0;
     else if(data_req_o)
         data_cyc <= 1'b1;

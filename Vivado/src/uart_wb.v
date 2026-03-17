@@ -10,7 +10,7 @@ module uart_wb(input         wb_cyc_i,
                output        wb_ack_o,
                output [31:0] wb_dat_o,
                output        wb_err_o,
-               input         wb_rst_i,
+               input         wb_rst_ni,
                input         wb_clk_i,
                
                input rx_i,
@@ -35,7 +35,7 @@ reg [3:0] sel;
 reg [31:0] adr,dat;
 
 assign clk = wb_clk_i;
-assign rst = ~wb_rst_i;
+assign rst = wb_rst_ni;
 
 assign rx_byte_o = rx_byte;
 assign wb_err_o = 1'b0;

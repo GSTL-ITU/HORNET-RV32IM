@@ -21,7 +21,7 @@ wire data_wb_stall_i;
 wire data_wb_ack_i;
 wire [31:0] data_wb_dat_i;
 wire data_wb_err_i;
-wire data_wb_rst_i;
+wire data_wb_rst_ni;
 wire data_wb_clk_i;
 
 wire inst_wb_cyc_o;
@@ -48,7 +48,7 @@ wire [NUM_SLAVES-1 : 0] wb_stall_o;
 wire [NUM_SLAVES-1 : 0] wb_ack_o;
 wire [31:0] wb_dat_o [NUM_SLAVES-1 : 0];
 wire [NUM_SLAVES-1 : 0] wb_err_o;
-wire [NUM_SLAVES-1 : 0] wb_rst_i;
+wire [NUM_SLAVES-1 : 0] wb_rst_ni;
 wire [NUM_SLAVES-1 : 0] wb_clk_i;
 reg [NUM_SLAVES-1 : 0] r_stb;
 
@@ -73,7 +73,7 @@ assign wb_we_i[0] = inst_wb_we_o;
 assign wb_adr_i[0] = inst_wb_adr_o;
 assign wb_dat_i[0] = inst_wb_dat_o;
 assign wb_sel_i[0] = inst_wb_sel_o;
-assign wb_rst_i[0] = ~rst_ni; // convert active low reset to active high for slaves
+assign wb_rst_ni[0] = rst_ni;
 assign wb_clk_i[0] = clk_i;
 assign inst_wb_dat_i = wb_dat_o[0];
 //assign inst_wb_ack_i = wb_ack_o[0];
@@ -90,15 +90,15 @@ generate
         assign wb_adr_i[i] = data_wb_adr_o;
         assign wb_dat_i[i] = data_wb_dat_o;
         assign wb_sel_i[i] = data_wb_sel_o;
-        assign wb_rst_i[i] = ~rst_ni;
+        assign wb_rst_ni[i] = rst_ni;
         assign wb_clk_i[i] = clk_i;
     end
 endgenerate
 
 //Register strobe signals
-always @(posedge wb_clk_i[0] or posedge wb_rst_i[0])
+always @(posedge wb_clk_i[0] or negedge wb_rst_ni[0])
 begin
-    if(wb_rst_i[0])
+    if(!wb_rst_ni[0])
         r_stb <= 0;
     else
         r_stb <= wb_stb_i;
@@ -160,10 +160,10 @@ assign data_wb_ack_i = r_data_wb_ack_i;
 assign data_wb_stall_i = r_data_wb_stall_i;
 assign data_wb_err_i = r_data_wb_err_i;
 assign data_wb_clk_i = clk_i;
-assign data_wb_rst_i = ~rst_ni;
+assign data_wb_rst_ni = rst_ni;
 
 //Tracer signals
-wire [31:0] tr_mem_data, tr_mem_addr, tr_reg_data, tr_pc, tr_instr, fflags;
+wire [31:0] tr_mem_data, tr_mem_addr, tr_reg_data, tr_pc, tr_instr;
 wire [4:0] tr_reg_addr;
 wire [1:0] tr_mem_len;
 wire tr_valid, tr_store, tr_load, tr_is_float;
@@ -182,7 +182,7 @@ core_wb #(.reset_vector(reset_vector)) core0  (.rst_ni(rst_ni),
                .data_wb_ack_i(data_wb_ack_i),
                .data_wb_dat_i(data_wb_dat_i),
                .data_wb_err_i(data_wb_err_i),
-               .data_wb_rst_i(data_wb_rst_i),
+               .data_wb_rst_ni(data_wb_rst_ni),
                .data_wb_clk_i(data_wb_clk_i),
 
                //Wishbone interface for instruction memory
@@ -215,8 +215,7 @@ core_wb #(.reset_vector(reset_vector)) core0  (.rst_ni(rst_ni),
                .tr_valid(tr_valid),
                .tr_load(tr_load),
                .tr_store(tr_store),
-               .tr_is_float(tr_is_float),
-               .fflags(fflags));
+               .tr_is_float(tr_is_float));
 
 
 tracer tracer(.clk_i(clk_i),
@@ -230,8 +229,7 @@ tracer tracer(.clk_i(clk_i),
                 .is_float(tr_is_float),
                 .mem_size(tr_mem_len),
                 .mem_addr(tr_mem_addr),
-                .mem_data(tr_mem_data),
-                .fpu_flags(fflags));
+                .mem_data(tr_mem_data));
 
 memory_2rw_wb #(.RAM_DEPTH(RAM_DEPTH), .MEMORY_INIT(MEMORY_INIT)) memory(.port0_wb_cyc_i(wb_cyc_i[0]),
                                         .port0_wb_stb_i(wb_stb_i[0]),
@@ -243,7 +241,7 @@ memory_2rw_wb #(.RAM_DEPTH(RAM_DEPTH), .MEMORY_INIT(MEMORY_INIT)) memory(.port0_
                                         .port0_wb_ack_o(wb_ack_o[0]),
                                         .port0_wb_dat_o(wb_dat_o[0]),
                                         .port0_wb_err_o(wb_err_o[0]),
-                                        .port0_wb_rst_i(wb_rst_i[0]),
+                                        .port0_wb_rst_ni(wb_rst_ni[0]),
                                         .port0_wb_clk_i(wb_clk_i[0]),
 
                                         .port1_wb_cyc_i(wb_cyc_i[1]),
@@ -256,7 +254,7 @@ memory_2rw_wb #(.RAM_DEPTH(RAM_DEPTH), .MEMORY_INIT(MEMORY_INIT)) memory(.port0_
                                         .port1_wb_ack_o(wb_ack_o[1]),
                                         .port1_wb_dat_o(wb_dat_o[1]),
                                         .port1_wb_err_o(wb_err_o[1]),
-                                        .port1_wb_rst_i(wb_rst_i[1]),
+                                        .port1_wb_rst_ni(wb_rst_ni[1]),
                                         .port1_wb_clk_i(wb_clk_i[1]));
 
 mtime_registers_wb #(.mtime_adr(32'h1000_8000),
@@ -271,7 +269,7 @@ mtime_registers_wb #(.mtime_adr(32'h1000_8000),
                                 .wb_ack_o(wb_ack_o[2]),
                                 .wb_dat_o(wb_dat_o[2]),
                                 .wb_err_o(wb_err_o[2]),
-                                .wb_rst_i(wb_rst_i[2]),
+                                .wb_rst_ni(wb_rst_ni[2]),
                                 .wb_clk_i(wb_clk_i[2]),
                                 .mtip_o(mtip));
 
@@ -285,7 +283,7 @@ debug_interface_wb debug_if (.wb_cyc_i(wb_cyc_i[3]),
                              .wb_ack_o(wb_ack_o[3]),
                              .wb_dat_o(wb_dat_o[3]),
                              .wb_err_o(wb_err_o[3]),
-                             .wb_rst_i(wb_rst_i[3]),
+                             .wb_rst_ni(wb_rst_ni[3]),
                              .wb_clk_i(wb_clk_i[3]));
 
 endmodule

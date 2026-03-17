@@ -10,7 +10,7 @@ module loader_wb(input         wb_cyc_i,
                  output        wb_ack_o,
                  output [31:0] wb_dat_o,
                  output        wb_err_o,
-                 input         wb_rst_i,
+                 input         wb_rst_ni,
                  input         wb_clk_i,
 
                  input       uart_rx_irq,
@@ -33,7 +33,6 @@ assign led2 = state == S1;
 assign led4 = state == S3;
 
 assign clk = wb_clk_i;
-assign rst = ~wb_rst_i;
 
 assign wb_dat_o = reset_cause;
 assign wb_stall_o = 1'b0;
@@ -41,25 +40,25 @@ assign wb_err_o = 1'b0;
 assign wb_ack_o = stb & wb_cyc_i;
 
 //input registers
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-    if(!rst)
+    if(!wb_rst_ni)
         stb <= 1'b0;
     else
         stb <= wb_stb_i;
 end
 
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-	if(!rst)
+	if(!wb_rst_ni)
 		state <= S0;
 	else
 		state <= next_state;
 end
 
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-	if(!rst)
+	if(!wb_rst_ni)
 		reset_o <= 1'b1;
 	else
 	begin
@@ -117,9 +116,9 @@ begin
 	endcase
 end
 
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-	if(!rst)
+	if(!wb_rst_ni)
 		reset_cause <= 32'b0;
 	else
 	begin
@@ -130,9 +129,9 @@ begin
 	end
 end
 
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-	if(!rst)
+	if(!wb_rst_ni)
 		counter <= 32'b0;
 	else
 	begin

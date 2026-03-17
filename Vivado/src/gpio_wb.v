@@ -31,7 +31,7 @@ module gpio_wb(
                output        wb_ack_o,
                output [31:0] wb_dat_o,
                output        wb_err_o,
-               input         wb_rst_i,
+               input         wb_rst_ni,
                input         wb_clk_i,
                output trigger_o);
 
@@ -45,7 +45,6 @@ reg [31:0] adr,dat;
 reg trigger;
 
 assign clk = wb_clk_i;
-assign rst = ~wb_rst_i;
 
 assign wb_err_o = 1'b0;
 assign wb_stall_o = 1'b0;
@@ -54,9 +53,9 @@ assign wb_ack_o = stb & wb_cyc_i;
 assign trigger_o = trigger;
 
 //input registers
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-    if(!rst)
+    if(!wb_rst_ni)
         {stb,we,sel,adr,dat} <= 70'b0; //Fixed from 69'b0 ?
     else
     begin
@@ -68,9 +67,9 @@ begin
     end
 end
 
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-    if(!rst)
+    if(!wb_rst_ni)
         trigger <= 0; //Fixed from 69'b0 ?
     else
     begin
@@ -80,10 +79,5 @@ begin
         else trigger <= trigger;
     end
 end
-
-
-
-
-
     
 endmodule

@@ -18,7 +18,7 @@ module memory_2rw_wb #(
     output wire                   port0_wb_ack_o,
     output reg  [31:0]            port0_wb_dat_o,
     output wire                   port0_wb_err_o,
-    input  wire                   port0_wb_rst_i,
+    input  wire                   port0_wb_rst_ni,
     input  wire                   port0_wb_clk_i,
 
     // ---------------------------------------------------------
@@ -34,7 +34,7 @@ module memory_2rw_wb #(
     output wire                   port1_wb_ack_o,
     output reg  [31:0]            port1_wb_dat_o,
     output wire                   port1_wb_err_o,
-    input  wire                   port1_wb_rst_i,
+    input  wire                   port1_wb_rst_ni,
     input  wire                   port1_wb_clk_i
 );
 
@@ -80,8 +80,8 @@ module memory_2rw_wb #(
     assign port0_wb_err_o   = 1'b0;
 
     // Port 0 Acknowledge Block
-    always @(posedge port0_wb_clk_i or posedge port0_wb_rst_i) begin
-        if (port0_wb_rst_i) begin
+    always @(posedge port0_wb_clk_i or negedge port0_wb_rst_ni) begin
+        if (!port0_wb_rst_ni) begin
             port0_ack <= 1'b0;
         end else if (port0_wb_cyc_i) begin
             port0_ack <= port0_wb_stb_i;
@@ -105,8 +105,8 @@ module memory_2rw_wb #(
     assign port1_wb_err_o   = 1'b0;
 
     // Port 1 Acknowledge Block (Async memory reset removed for Vivado BRAM compatibility)
-    always @(posedge port1_wb_clk_i or posedge port1_wb_rst_i) begin
-        if (port1_wb_rst_i) begin
+    always @(posedge port1_wb_clk_i or negedge port1_wb_rst_ni) begin
+        if (!port1_wb_rst_ni) begin
             port1_ack <= 1'b0; 
         end else if (port1_wb_cyc_i) begin
             port1_ack <= port1_wb_stb_i;

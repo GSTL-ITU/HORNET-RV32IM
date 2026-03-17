@@ -10,7 +10,7 @@ module mtime_registers_wb(input         wb_cyc_i,
                           output        wb_ack_o,
                           output reg [31:0] wb_dat_o,
                           output        wb_err_o,
-                          input         wb_rst_i,
+                          input         wb_rst_ni,
                           input         wb_clk_i,
                           
                           output mtip_o);
@@ -29,16 +29,15 @@ reg [3:0] sel;
 reg [31:0] adr,dat;
 
 assign clk = wb_clk_i;
-assign rst = ~wb_rst_i;
 
 assign wb_err_o = 1'b0;
 assign wb_stall_o = 1'b0;
 assign wb_ack_o = stb & wb_cyc_i;
 
 //input registers
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-    if(!rst)
+    if(!wb_rst_ni)
         {stb,we,sel,adr,dat} <= 69'b0;
     else
     begin
@@ -50,9 +49,9 @@ begin
     end
 end
 
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-    if(!rst)
+    if(!wb_rst_ni)
         mtime <= 64'b0;
     else if(wb_cyc_i && stb && we)
     begin
@@ -94,9 +93,9 @@ begin
     end
 end
 
-always @(posedge clk or negedge rst)
+always @(posedge clk or negedge wb_rst_ni)
 begin
-    if(!rst)
+    if(!wb_rst_ni)
         mtimecmp <= 64'b0;
     else if(wb_cyc_i && stb && we)
     begin

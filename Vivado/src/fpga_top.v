@@ -22,6 +22,8 @@ wire [31:0] loader_reg_o;
 wire reset;
 wire irq_ack_o;
 
+assign reset = loader_reset & rst_ni;
+
 wire clk_i, locked;
 clk_wiz_0 clkwiz0
 (
@@ -47,7 +49,7 @@ wire data_wb_stall_i;
 wire data_wb_ack_i;
 wire [31:0] data_wb_dat_i;
 wire data_wb_err_i;
-wire data_wb_rst_i;
+wire data_wb_rst_ni;
 wire data_wb_clk_i;
 
 wire inst_wb_cyc_o;
@@ -60,7 +62,7 @@ wire inst_wb_stall_i;
 wire inst_wb_ack_i;
 wire [31:0] inst_wb_dat_i;
 wire inst_wb_err_i;
-wire inst_wb_rst_i;
+wire inst_wb_rst_ni;
 wire inst_wb_clk_i;
 
 
@@ -115,13 +117,13 @@ assign wb_we_i[0] = inst_wb_we_o;
 assign wb_adr_i[0] = inst_wb_adr_o;
 assign wb_dat_i[0] = inst_wb_dat_o;
 assign wb_sel_i[0] = inst_wb_sel_o;
-assign wb_rst_i[0] = ~reset;
+assign wb_rst_ni[0] = rst_ni;
 assign wb_clk_i[0] = clk_i;
 assign inst_wb_dat_i = wb_dat_o[0];
 assign inst_wb_ack_i = wb_ack_o[0];
 assign inst_wb_stall_i = wb_stall_o[0];
 assign inst_wb_err_i = wb_err_o[0];
-assign inst_wb_rst_i = ~reset;
+assign inst_wb_rst_ni = rst_ni;
 assign inst_wb_clk_i = clk_i;
 
 assign stb = wb_stb_i[3];
@@ -137,9 +139,9 @@ generate
         assign wb_dat_i[i] = data_wb_dat_o;
         assign wb_sel_i[i] = data_wb_sel_o;
         if(i == 4)
-            assign wb_rst_i[i] = ~rst_ni;
+            assign wb_rst_ni[i] = rst_ni;
         else
-            assign wb_rst_i[i] = ~reset;
+            assign wb_rst_ni[i] = reset;
         assign wb_clk_i[i] = clk_i;
     end
 endgenerate
@@ -188,12 +190,12 @@ assign data_wb_ack_i = r_data_wb_ack_i;
 assign data_wb_stall_i = r_data_wb_stall_i;
 assign data_wb_err_i = r_data_wb_err_i;
 assign data_wb_clk_i = clk_i;
-assign data_wb_rst_i = ~reset;
+assign data_wb_rst_ni = reset;
 
-assign reset = loader_reset & rst_ni;
+
 
 core_wb #(.reset_vector(32'h0))
-    core0(.rst_ni(reset), //active-low reset
+    core0(.reset_i(reset), //active-low reset
           .clk_i(clk_i),
           //Wishbone interface for data memory
           .data_wb_cyc_o(data_wb_cyc_o),
@@ -239,7 +241,7 @@ memory_2rw_wb #(.RAM_DEPTH(RAM_DEPTH), .MEMORY_INIT(MEMORY_INIT))
            .port0_wb_ack_o(wb_ack_o[0]),
            .port0_wb_dat_o(wb_dat_o[0]),
            .port0_wb_err_o(wb_err_o[0]),
-           .port0_wb_rst_i(wb_rst_i[0]),
+           .port0_wb_rst_ni(wb_rst_ni[0]),
            .port0_wb_clk_i(wb_clk_i[0]),
 
            .port1_wb_cyc_i(wb_cyc_i[1]),
@@ -252,7 +254,7 @@ memory_2rw_wb #(.RAM_DEPTH(RAM_DEPTH), .MEMORY_INIT(MEMORY_INIT))
            .port1_wb_ack_o(wb_ack_o[1]),
            .port1_wb_dat_o(wb_dat_o[1]),
            .port1_wb_err_o(wb_err_o[1]),
-           .port1_wb_rst_i(wb_rst_i[1]),
+           .port1_wb_rst_ni(wb_rst_ni[1]),
            .port1_wb_clk_i(wb_clk_i[1]));
 
 mtime_registers_wb #(.mtime_adr(32'h1000_8000),
@@ -267,7 +269,7 @@ mtime_registers_wb #(.mtime_adr(32'h1000_8000),
                .wb_ack_o(wb_ack_o[2]),
                .wb_dat_o(wb_dat_o[2]),
                .wb_err_o(wb_err_o[2]),
-               .wb_rst_i(wb_rst_i[2]),
+               .wb_rst_ni(wb_rst_ni[2]),
                .wb_clk_i(wb_clk_i[2]),
                .mtip_o(mtip));
 
@@ -282,7 +284,7 @@ uart_wb #(.SYS_CLK_FREQ(SYS_CLK_FREQ), .BAUD(115200))
           .wb_ack_o(wb_ack_o[3]),
           .wb_dat_o(wb_dat_o[3]),
           .wb_err_o(wb_err_o[3]),
-          .wb_rst_i(wb_rst_i[3]),
+          .wb_rst_ni(wb_rst_ni[3]),
           .wb_clk_i(wb_clk_i[3]),
 
           .rx_i(rx_i),
@@ -301,7 +303,7 @@ loader_wb #(.SYS_CLK_FREQ(SYS_CLK_FREQ))
             .wb_ack_o(wb_ack_o[4]),
             .wb_dat_o(wb_dat_o[4]),
             .wb_err_o(wb_err_o[4]),
-            .wb_rst_i(wb_rst_i[4]),
+            .wb_rst_ni(wb_rst_ni[4]),
             .wb_clk_i(wb_clk_i[4]),
 
             .uart_rx_irq(rx_irq_o),
@@ -319,7 +321,7 @@ gpio_wb   gpio(.wb_cyc_i(wb_cyc_i[5]),
           .wb_ack_o(wb_ack_o[5]),
           .wb_dat_o(wb_dat_o[5]),
           .wb_err_o(wb_err_o[5]),
-          .wb_rst_i(wb_rst_i[5]),
+          .wb_rst_ni(wb_rst_ni[5]),
           .wb_clk_i(wb_clk_i[5]),
           .trigger_o(trigger)
           );

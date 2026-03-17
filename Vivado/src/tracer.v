@@ -7,12 +7,14 @@ module tracer(input clk_i,
                 input is_load, is_store, is_float,
                 input [1:0] mem_size,
                 input [31:0] mem_addr,
-                input [31:0] mem_data,
-                input [31:0] fpu_flags);
+                input [31:0] mem_data);
 // This module is used to trace the execution of the processor. It writes the PC, instruction, register address, register data, memory write enable, memory address and memory data to a file.
 
 
 integer file_pointer;
+wire [31:0] fpu_flags;
+
+assign fpu_flags = 32'b0; //We don't have an FPU, so we can just set the flags to 0. This is required to avoid X's in the trace log.
 
 initial begin
 file_pointer = $fopen("../../../../../trace.log", "w"); //The file is normally located in <vivado-dir>\HornetRISCV-vivado.sim\sim_1\behav\xsim, so let's use relative path to move it to the main folder

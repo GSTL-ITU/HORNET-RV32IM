@@ -21,7 +21,7 @@ module core(input rst_ni, //active-low reset
             output irq_ack_o, //interrupt acknowledge signal. driven high for one cycle when an external interrupt is handled. 
             //Tracer signals
             output reg [31:0] tr_mem_data, tr_mem_addr,
-            output [31:0] tr_reg_data, tr_pc, tr_instr, fflags,
+            output [31:0] tr_reg_data, tr_pc, tr_instr,
             output [4:0]  tr_reg_addr,
             output [1:0]  tr_mem_len,
             output        tr_valid, tr_load, tr_store, tr_is_float
@@ -161,7 +161,6 @@ reg        EXMEM_preg_dummy; //indicates if the instruction in MEM stage is dumm
 reg        EXMEM_preg_mret; //driven high when the instruction in MEM stage is MRET.
 reg        EXMEM_preg_misaligned; //driven high when the instruction in MEM stage is a misaligned access.
 reg [1:0]  EXMEM_preg_addr_bits; //two least-significant bits of data address.
-reg [31:0] EXMEM_preg_fflags;
 //END EX SIGNALS--------END EX SIGNALS--------END EX SIGNALS--------END EX SIGNALS--------END EX SIGNALS--------END EX SIGNALS
 
 //MEM SIGNALS--------MEM SIGNALS--------MEM SIGNALS--------MEM SIGNALS--------MEM SIGNALS--------MEM SIGNALS--------MEM SIGNALS
@@ -188,7 +187,6 @@ reg [31:0] MEMWB_preg_memout;
 reg [31:0] MEMWB_preg_memin; //Data going into memory, for tracing purposes
 reg [2:0]  MEMWB_preg_mem; //To forward to WB stage for debugging (?)
 reg [31:0] MEMWB_preg_aluout, MEMWB_preg_imm;
-reg [31:0] MEMWB_preg_fflags;
 reg [11:0] MEMWB_preg_csr_addr;
 reg [8:0]  MEMWB_preg_wb;
 reg        MEMWB_preg_mret;
@@ -258,7 +256,6 @@ csr_unit #(.reset_vector(reset_vector)) CSR_UNIT
                   .misaligned_ex(IDEX_preg_misaligned),
                   .instr_access_fault_i(instr_access_fault_i),
                   .data_err_i(data_err_i),
-                  .wb_fflags_i(MEMWB_preg_fflags),
 
                   .csr_reg_o(csr_reg_out),
                   .mepc_o(mepc),
@@ -346,8 +343,7 @@ assign mux_ctrl_ID = hazard_stall;
 assign mux_ctrl_reg_bank = mux_ctrl_rb_WB;
 assign csr_wen_ID = ctrl_unit_wb_csr_wen;
 
-assign mux1_o_ID    = mux_ctrl_ID ? 9'h0c : {ctrl_unit_wb_int_or_float,
-                                             ctrl_unit_wb_rb_sel,
+assign mux1_o_ID    = mux_ctrl_ID ? 8'h0c : {ctrl_unit_wb_rb_sel,
                                              ctrl_unit_wb_mux,
                                              ctrl_unit_wb_sign,
                                              ctrl_unit_wb_rf_wen,
@@ -633,7 +629,6 @@ begin
 		EXMEM_preg_mret <= 1'b0;
 		EXMEM_preg_misaligned <= 1'b0;
 		EXMEM_preg_addr_bits <= 2'b0;
-        EXMEM_preg_fflags <= 32'b0;
 	end
 
 	else if(stall_EX || csr_ex_flush)
@@ -651,7 +646,6 @@ begin
         EXMEM_preg_mret <= 1'b0;
         EXMEM_preg_misaligned <= 1'b0;
         EXMEM_preg_addr_bits <= 2'b0;
-        EXMEM_preg_fflags <= 32'b0;
 	end
 
 	else
@@ -674,7 +668,6 @@ begin
 		EXMEM_preg_mret <= IDEX_preg_mret;
 		EXMEM_preg_misaligned <= IDEX_preg_misaligned;
 		EXMEM_preg_addr_bits <= aluout_EX[1:0];
-        EXMEM_preg_fflags <= {csr_float_i};
 	end
 end
 
@@ -731,7 +724,6 @@ begin
 		MEMWB_preg_aluout <= 32'b0;
 		MEMWB_preg_imm <= 32'b0;
 		MEMWB_preg_mret <= 1'b0;
-        MEMWB_preg_fflags <= 32'b0;
 		//MEMWB_preg_misaligned <= 1'b0; //Unused
 	end
 
@@ -749,7 +741,6 @@ begin
 		MEMWB_preg_imm <= 32'b0;
 		MEMWB_preg_mret <= 1'b0;
         MEMWB_preg_dummy <= 1'b1;
-        MEMWB_preg_fflags <= 32'b0;
 		//MEMWB_preg_misaligned <= 1'b0; //Unused
 	end
 
@@ -767,7 +758,6 @@ begin
 		MEMWB_preg_memin <= memin_MEM;
 		MEMWB_preg_mret <= EXMEM_preg_mret;
         MEMWB_preg_dummy <= EXMEM_preg_dummy;
-        MEMWB_preg_fflags <= EXMEM_preg_fflags;
 		//MEMWB_preg_misaligned <= EXMEM_preg_misaligned; //Unused
 	end
 end
@@ -868,8 +858,6 @@ assign tr_load = is_load; //Load instruction
 assign tr_store = is_store; //Store instruction
 
 assign tr_is_float = mux_ctrl_rb_WB; //Uses float register bank
-
-assign fflags = MEMWB_preg_fflags;
 
 assign tr_reg_data = {32{~rf_wen_WB}} & mux_o_WB; //Return this only if register file is being written to, otherwise it's 0, we should also invert the active low WE signal
 assign tr_reg_addr = {5{~rf_wen_WB}} & rd_WB; //Return this only if register file is being written to, otherwise it's 0, we should also invert the active low WE signal
