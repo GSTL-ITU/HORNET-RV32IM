@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module core_wb(input reset_i, //active-low reset
+module core_wb(input rst_ni, //active-low reset
                input clk_i,
 
                //Wishbone interface for data memory
@@ -62,7 +62,7 @@ core    #(.reset_vector(reset_vector))
         core0(
         //Clock and reset signals.
         .clk_i(clk_i),
-        .reset_i(reset_i), //active-low, asynchronous reset
+        .rst_ni(rst_ni), //active-low, asynchronous reset
 
         //Data memory interface
         .data_addr_o(data_addr_o),

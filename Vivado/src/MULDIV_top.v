@@ -1,7 +1,7 @@
 module MULDIV_top (
     input clk,
     input start,
-    input reset,
+    input rst_ni,
     input [31:0] in_A,
     input [31:0] in_B,
     input [1:0] op_div,
@@ -25,7 +25,7 @@ module MULDIV_top (
     reg [63:0] reg_AB, reg_muldiv;
 
 
-    MULDIV_ctrl MULDIV_ctrl(clk, start, reset, muldiv_sel, AB_status, div_rdy, op_mul, op_div, in_A, in_B, out_A_2C, out_B_2C,
+    MULDIV_ctrl MULDIV_ctrl(clk, start, rst_ni, muldiv_sel, AB_status, div_rdy, op_mul, op_div, in_A, in_B, out_A_2C, out_B_2C,
     div_start, reg_AB_en, reg_muldiv_en, mux_muldiv_sel, mux_muldiv_out_sel, mux_fastres_sel, fastres, muldiv_done);
 
     MULDIV_in MULDIV_in(in_A, in_B, op_div[0], op_mul, muldiv_sel,
@@ -33,8 +33,8 @@ module MULDIV_top (
 
     assign AB = reg_AB;
 
-    multiplier_32 MUL(clk, reset, AB[63:32], AB[31:0], P);
-    divider_32 DIV(clk, div_start, reset, AB[63:32], AB[31:0], div_rdy, QR);
+    multiplier_32 MUL(clk, rst_ni, AB[63:32], AB[31:0], P);
+    divider_32 DIV(clk, div_start, rst_ni, AB[63:32], AB[31:0], div_rdy, QR);
 
     assign muldiv1 = mux_muldiv_sel ? QR : P;
 
@@ -48,8 +48,8 @@ module MULDIV_top (
     assign R = mux_fastres_sel ? fastres : muldiv_out;
 
 
-    always @ (posedge clk or negedge reset) begin
-        if(!reset) begin
+    always @ (posedge clk or negedge rst_ni) begin
+        if(!rst_ni) begin
             reg_AB <= 63'd0;
             reg_muldiv <= 63'd0;
         end

@@ -1,6 +1,6 @@
 module multiplier_32(
     input clk,
-    input reset,
+    input rst_ni,
     input [31:0] M_inA,
     input [31:0] M_inB,
     output [63:0] P
@@ -63,10 +63,10 @@ module multiplier_32(
 
 
     //Assigning Registers
-    always @ (posedge clk or negedge reset)
+    always @ (posedge clk or negedge rst_ni)
     begin
 
-        if(!reset) begin
+        if(!rst_ni) begin
 
             PPHH_mreg[0] <= 16'd0;
             PPHH_mreg[1] <= 16'd0;

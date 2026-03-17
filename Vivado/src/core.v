@@ -1,4 +1,4 @@
-module core(input reset_i, //active-low reset
+module core(input rst_ni, //active-low reset
 
             input clk_i,
 
@@ -72,11 +72,6 @@ wire       ctrl_unit_IDEX_data2_sel;
 wire       ctrl_unit_wb_int_or_float;
 wire       ctrl_unit_illegal_instr, ctrl_unit_ecall, ctrl_unit_ebreak;
 
-// control signals for fpu arithmetic
-wire [4:0] ctrl_unit_fpu_func; // fpu func
-wire [2:0] ctrl_unit_fpu_rm; // fpu rounding mode
-wire       ctrl_unit_fpu_start;
-
 //mux signals
 wire        mux_ctrl_ID; //control signal for all three muxes
 wire        mux_ctrl_reg_bank;
@@ -105,7 +100,6 @@ reg        IDEX_preg_dummy; //indicates if the instruction in the EX stage is du
 reg        IDEX_preg_mret; //driven high when the instruction in EX stage is MRET.
 reg        IDEX_preg_misaligned; //driven high when the second part of a misaligned access is being executed in EX stage.
 reg [31:0] register_bank [31:1]; //32x32 register file //REMOVED R0 for optimization
-reg [31:0] f_register_bank [31:0]; //32x32 f_register file
 //END ID SIGNALS--------END ID SIGNALS--------END ID SIGNALS--------END ID SIGNALS--------END ID SIGNALS--------END ID SIGNALS
 
 //EX SIGNALS--------EX SIGNALS--------EX SIGNALS--------EX SIGNALS--------EX SIGNALS--------EX SIGNALS--------EX SIGNALS
@@ -137,23 +131,7 @@ wire [1:0]  csr_alu_func;
 wire [31:0] aluout_EX;
 wire [31:0] csr_alu_out;
 
-
-//FPU signals
-wire        fpu_start;
-wire [4:0]  fpu_func;
-wire [2:0]  fpu_rm;
-wire [31:0] fpu_out_EX;
-wire        fpu_done_EX;
-wire        fpu_stall_EX;
-wire        forward_fpu_alu_mem_sel;
-
 // exceptions
-wire        fpu_overflow;
-wire        fpu_underflow;
-wire        fpu_invalid;
-wire        fpu_inexact;
-wire        fpu_div_by_zero;
-
 wire [31:0] csr_float_i; // Can be connected to the CSR unit later for a proper privileged float implementation, but it's for the tracer only for now.
 
 wire        stall_EX;
@@ -183,7 +161,6 @@ reg        EXMEM_preg_dummy; //indicates if the instruction in MEM stage is dumm
 reg        EXMEM_preg_mret; //driven high when the instruction in MEM stage is MRET.
 reg        EXMEM_preg_misaligned; //driven high when the instruction in MEM stage is a misaligned access.
 reg [1:0]  EXMEM_preg_addr_bits; //two least-significant bits of data address.
-reg [31:0] EXMEM_preg_fpuout;
 reg [31:0] EXMEM_preg_fflags;
 //END EX SIGNALS--------END EX SIGNALS--------END EX SIGNALS--------END EX SIGNALS--------END EX SIGNALS--------END EX SIGNALS
 
@@ -192,7 +169,6 @@ reg [31:0] EXMEM_preg_fflags;
 wire [8:0]  wb_MEM;
 wire [2:0]  mem_MEM;
 wire [31:0] aluout_MEM; //data2_MEM; //Unused
-wire [31:0] fpu_out_MEM;
 wire [4:0]  rd_MEM;
 wire [31:0] imm_MEM;
 wire [31:0] memin_MEM;
@@ -212,7 +188,6 @@ reg [31:0] MEMWB_preg_memout;
 reg [31:0] MEMWB_preg_memin; //Data going into memory, for tracing purposes
 reg [2:0]  MEMWB_preg_mem; //To forward to WB stage for debugging (?)
 reg [31:0] MEMWB_preg_aluout, MEMWB_preg_imm;
-reg [31:0] MEMWB_preg_fpuout;
 reg [31:0] MEMWB_preg_fflags;
 reg [11:0] MEMWB_preg_csr_addr;
 reg [8:0]  MEMWB_preg_wb;
@@ -230,12 +205,10 @@ wire        load_sign;
 wire [1:0]  mem_length_WB;
 wire [1:0]  mux_ctrl_WB;
 wire        mux_ctrl_rb_WB;
-//wire        mux_ctrl_alufpu_sel; //Unused
 wire        rf_wen_WB, csr_wen_WB;
 wire [11:0] csr_addr_WB;
 wire [31:0] memout_WB, aluout_WB, imm_WB;
 wire [31:0] memin_WB;
-wire [31:0] fpuout_WB;
 wire        mret_WB;
 reg [31:0]  mux_o_WB;
 wire [31:0] pc_WB; //for tracing purposes
@@ -250,7 +223,6 @@ reg [31:0] csr_pc_input;
 wire [31:0] irq_addr; //interrupt handler address from CSR unit
 wire [31:0] mepc; //mepc from CSR unit
 wire [31:0] csr_reg_out;
-wire [2:0] csr_fpu_dyn_rm;
 
 //END CSR SIGNALS--------END CSR SIGNALS--------END CSR SIGNALS--------END CSR SIGNALS--------END CSR SIGNALS
 assign csr_pcin_mux1_o = csr_ex_flush ? pc_EX : pc_ID;
@@ -260,9 +232,9 @@ assign csr_stall = !csr_wen_ID &&
                    (csr_addr_ID == csr_addr_MEM && !csr_wen_MEM) ||
                    (csr_addr_ID == csr_addr_WB && !csr_wen_WB));
 
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-	if(!reset_i)
+	if(!rst_ni)
 		csr_pc_input <= reset_vector;
 	else
 		csr_pc_input <= csr_pcin_mux2_o;
@@ -270,7 +242,7 @@ end
 //instantiate CSR Unit
 csr_unit #(.reset_vector(reset_vector)) CSR_UNIT 
                 (.clk_i(clk_i),
-                  .reset_i(reset_i),
+                  .rst_ni(rst_ni),
                   .pc_i(csr_pc_input),
                   .csr_r_addr_i(IFID_preg_instr[31:20]),
                   .csr_w_addr_i(csr_addr_WB),
@@ -288,7 +260,6 @@ csr_unit #(.reset_vector(reset_vector)) CSR_UNIT
                   .data_err_i(data_err_i),
                   .wb_fflags_i(MEMWB_preg_fflags),
 
-                  .fpu_dyn_rm(csr_fpu_dyn_rm),
                   .csr_reg_o(csr_reg_out),
                   .mepc_o(mepc),
                   .irq_addr_o(irq_addr),
@@ -316,14 +287,14 @@ assign mux2_o_IF = mux2_ctrl_IF ? pc_o : pc_o + 32'd4; //this mux is responsible
 assign mux3_o_IF = mux3_ctrl_IF ? branch_target_addr : mux2_o_IF; //branch mux
 assign mux4_o_IF = mux4_ctrl_IF ? mux3_o_IF : mux1_o_IF;
 
-assign pc_i = reset_i ? mux4_o_IF : reset_vector;
+assign pc_i = rst_ni ? mux4_o_IF : reset_vector;
 assign instr_addr_o = pc_i;
 
-assign stall_IF = hazard_stall | muldiv_stall_EX | fpu_stall_EX | misaligned_access | data_stall_i | csr_stall;
+assign stall_IF = hazard_stall | muldiv_stall_EX | misaligned_access | data_stall_i | csr_stall;
 
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-	if(!reset_i)
+	if(!rst_ni)
 	begin
 		//reset pc to reset vector.
 		pc_o <= reset_vector;
@@ -370,11 +341,9 @@ assign imm_dec_i    = IFID_preg_instr[31:2];
 assign csr_addr_ID  = IFID_preg_instr[31:20];
 assign instr_ID     = IFID_preg_instr; //for tracing purposes
 //assign nets
-assign stall_ID = hazard_stall | muldiv_stall_EX | fpu_stall_EX | misaligned_access | data_stall_i | csr_stall; //TODO: move csr stall below
+assign stall_ID = hazard_stall | muldiv_stall_EX | misaligned_access | data_stall_i | csr_stall; //TODO: move csr stall below
 assign mux_ctrl_ID = hazard_stall;
-//assign  =  ((IFID_preg_instr[6:0] == 7'b0000111) | (IFID_preg_instr[6:0] == 7'b0100111)) ? 1 : 0;
 assign mux_ctrl_reg_bank = mux_ctrl_rb_WB;
-//assign mux_ctrl_reg_bank = IFID_preg_instr[6:0] == 7'b0100111 ? 1 : 0;
 assign csr_wen_ID = ctrl_unit_wb_csr_wen;
 
 assign mux1_o_ID    = mux_ctrl_ID ? 9'h0c : {ctrl_unit_wb_int_or_float,
@@ -387,10 +356,7 @@ assign mux1_o_ID    = mux_ctrl_ID ? 9'h0c : {ctrl_unit_wb_int_or_float,
 
 assign mux2_o_ID    = mux_ctrl_ID ? 3'b1 : {ctrl_unit_mem_len, ctrl_unit_mem_wen};
 
-assign mux3_o_ID    = mux_ctrl_ID ? 30'b0 : {ctrl_unit_fpu_start,   
-                                             ctrl_unit_fpu_func,
-                                             ctrl_unit_fpu_rm,
-                                             ctrl_unit_op_div,
+assign mux3_o_ID    = mux_ctrl_ID ? 30'b0 : {ctrl_unit_op_div,
                                              ctrl_unit_op_mul,
                                              ctrl_unit_muldiv_sel,
                                              ctrl_unit_muldiv_start,
@@ -429,10 +395,6 @@ control_unit    CTRL_UNIT   (.muldiv_start(ctrl_unit_muldiv_start),
                              .WB_rb_sel(ctrl_unit_wb_rb_sel),
                              .IDEX_data1_sel(ctrl_unit_IDEX_data1_sel),
                              .IDEX_data2_sel(ctrl_unit_IDEX_data2_sel),
-                             .INTorFloat(ctrl_unit_wb_int_or_float),
-                             .fpu_func(ctrl_unit_fpu_func),
-                             .fpu_rm(ctrl_unit_fpu_rm),
-                             .fpu_start(ctrl_unit_fpu_start),
                              .illegal_instr(ctrl_unit_illegal_instr),
                              .ecall_o(ctrl_unit_ecall),
                              .ebreak_o(ctrl_unit_ebreak),
@@ -442,30 +404,21 @@ imm_decoder     IMM_DEC	    (.instr_in(imm_dec_i), .imm_out(imm_dec_o));
 
 //write to register file
 integer i;
-always @(negedge clk_i or negedge reset_i)
+always @(negedge clk_i or negedge rst_ni)
 begin
-	if(!reset_i)
+	if(!rst_ni)
 	begin
 		for(i=1; i < 32; i = i+1)
 			register_bank[i] <= 32'b0; //reset all registers to 0.
-        for(i=0; i < 32; i = i+1)
-            f_register_bank[i] <= 32'b0; //reset FPU registers as well
 	end
 
-	else if(!rf_wen_WB)
-    begin
-        //if (ld)
-        if(!mux_ctrl_reg_bank)
-		    register_bank[rd_WB] <= mux_o_WB;
-        //else (fld)
-        else
-            f_register_bank[rd_WB] <= mux_o_WB;
-    end            
+	else if(!rf_wen_WB && !mux_ctrl_reg_bank)
+		register_bank[rd_WB] <= mux_o_WB;         
 end
 
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-	if(!reset_i)
+	if(!rst_ni)
 	begin
 		IDEX_preg_wb <= 9'h0c;
 		IDEX_preg_mem <= 3'b1;
@@ -544,24 +497,14 @@ begin
             IDEX_preg_data1_sel <= ctrl_unit_IDEX_data1_sel;
 		    IDEX_preg_data2_sel <= ctrl_unit_IDEX_data2_sel;
 
-            if(rs1_ID == 5'b0 & ctrl_unit_IDEX_data1_sel == 1'b0) //F registers do not have a dedicated zero register, therefore the select bit must also be specified here
+            if(rs1_ID == 5'b0 & ctrl_unit_IDEX_data1_sel == 1'b0)
                 IDEX_preg_data1 <= 32'b0;   //Load 0 if register 1 is x0
             else
-            begin
-                if(ctrl_unit_IDEX_data1_sel)
-                    IDEX_preg_data1 <= f_register_bank[rs1_ID];
-                else 
-                    IDEX_preg_data1 <= register_bank[rs1_ID];
-            end
+                IDEX_preg_data1 <= register_bank[rs1_ID];
             if(rs2_ID == 5'b0 & ctrl_unit_IDEX_data2_sel == 1'b0)
                 IDEX_preg_data2 <= 32'b0;
             else
-            begin
-                if(ctrl_unit_IDEX_data2_sel)
-                    IDEX_preg_data2 <= f_register_bank[rs2_ID];
-                else
-                    IDEX_preg_data2 <= register_bank[rs2_ID];
-            end
+                IDEX_preg_data2 <= register_bank[rs2_ID];
         end
     end
 end
@@ -573,7 +516,7 @@ end
 //instantiate MULDIV
 MULDIV_top MULDIV(.clk(clk_i),
                   .start(muldiv_start),
-                  .reset(reset_i),
+                  .rst_ni(rst_ni),
                   .in_A(mux2_o_EX),
                   .in_B(mux4_o_EX),
                   .op_div(op_div),
@@ -583,7 +526,6 @@ MULDIV_top MULDIV(.clk(clk_i),
                   .muldiv_done(muldiv_done_EX));
 
 assign muldiv_stall_EX = muldiv_start & ~muldiv_done_EX;
-assign fpu_stall_EX = fpu_start & ~fpu_done_EX;
 
 hazard_detection_unit HZRD_DET_UNIT (.rs1(rs1_ID),
                                      .rs2(rs2_ID),
@@ -622,26 +564,21 @@ assign muldiv_start = ex_EX[15];
 assign muldiv_sel   = ex_EX[16];
 assign op_mul       = ex_EX[18:17];
 assign op_div       = ex_EX[20:19];
-assign fpu_rm       = ex_EX[23:21];
-assign fpu_func     = ex_EX[28:24];
-assign fpu_start    = ex_EX[29];
 assign L            = (!wb_EX[3] && wb_EX[6:5] == 2'b1) ? 1'b1 : 1'b0; //load
-assign mem_wen_EX   = (muldiv_stall_EX | fpu_stall_EX) ? 1'b1 : (csr_ex_flush ? 1'b1 : mem_EX[0]);
+assign mem_wen_EX   = muldiv_stall_EX ? 1'b1 : (csr_ex_flush ? 1'b1 : mem_EX[0]);
 assign mem_length_EX = mem_EX[2:1];
 assign csr_wen_EX = wb_EX[2];
 
 //muxes
 assign mux1_o_EX = mux1_ctrl_EX ? pc_EX : mux2_o_EX;
 
-assign mux2_o_EX = mux2_ctrl_EX == 2'b11 ? fpu_out_MEM
-                 : mux2_ctrl_EX == 2'b10 ? aluout_MEM
+assign mux2_o_EX = mux2_ctrl_EX == 2'b10 ? aluout_MEM
                  : mux2_ctrl_EX == 2'b01 ? mux_o_WB
                  : data1_EX;
 
 assign mux3_o_EX =  mux3_ctrl_EX ? imm_EX : mux4_o_EX;
 
-assign mux4_o_EX = mux4_ctrl_EX == 2'b11 ? fpu_out_MEM
-                 : mux4_ctrl_EX == 2'b10 ? data2_EX
+assign mux4_o_EX = mux4_ctrl_EX == 2'b10 ? data2_EX
                  : mux4_ctrl_EX == 2'b01 ? mux_o_WB
                  : aluout_MEM;
                  
@@ -660,11 +597,6 @@ assign csr_alu_out = csr_alu_func == 2'd0 ? mux8_o_EX
 forwarding_unit FWD_UNIT(.rs1(rs1_EX),
                          .rs2(rs2_EX),
                          .exmem_rd(rd_MEM),
-                         .fpu_alu_mem_sel(forward_fpu_alu_mem_sel),
-                         .fpu_reg_bank_ex1(data1_sel_EX),
-                         .fpu_reg_bank_ex2(data2_sel_EX),
-                         .fpu_reg_bank_exmem_rd(mux_ctrl_rb_MEM),
-                         .fpu_reg_bank_memwb_rd(mux_ctrl_rb_WB),
                          .memwb_rd(rd_WB),
                          .exmem_wb(wb_MEM[3]),
                          .memwb_wb(rf_wen_WB),
@@ -675,30 +607,6 @@ ALU ALU (.src1(mux1_o_EX),
          .src2(mux3_o_EX), 
          .func(alu_func), 
          .alu_out(aluout_EX));
-fpu_top fpu_top
-(
-    //inputs
-    .clk(clk_i),
-    .reset(reset_i),
-    .start(fpu_start),
-    .op(fpu_func),
-    .rounding_mode(fpu_rm),
-    .csr_dynamic_rounding_mode(csr_fpu_dyn_rm),
-    .A(mux2_o_EX),
-    .B(mux4_o_EX),
-    .rs2_lsb(rs2_EX[0]), // input for conversion type. 0 for signed, 1 for unsigned
-    // outputs
-    .fpu_arith_out(fpu_out_EX),
-    .done(fpu_done_EX),
-    .overflow(fpu_overflow),
-    .underflow(fpu_underflow),
-    .invalid(fpu_invalid),
-    .inexact(fpu_inexact),
-    .div_by_zero(fpu_div_by_zero)
-    );
-
-//assign csr_float_i = {24'b0,fpu_rm,fpu_invalid,fpu_div_by_zero,fpu_overflow,fpu_underflow,fpu_inexact} & {32{fpu_done_EX}};
-assign csr_float_i = {27'b0,fpu_invalid,fpu_div_by_zero,fpu_overflow,fpu_underflow,fpu_inexact} & {32{fpu_done_EX}}; //fpu_rm stored inside csr unit, as a register
 
 //branch logic and address calculation
 assign take_branch = J | (B & aluout_EX[0]);
@@ -706,17 +614,17 @@ assign branch_addr_calc = mux5_o_EX + imm_EX;
 assign branch_target_addr[31:1] = branch_addr_calc[31:1];
 assign branch_target_addr[0] = (!mux5_ctrl_EX & J) ? 1'b0 : branch_addr_calc[0]; //clear the least-significant bit if the instruction is JALR.
 assign instr_addr_misaligned = take_branch & (branch_target_addr[1:0] != 2'd0);
-assign stall_EX = muldiv_stall_EX | fpu_stall_EX | data_stall_i;
+assign stall_EX = muldiv_stall_EX | data_stall_i;
 
-always @(posedge clk_i or negedge reset_i) //clock the outputs to the pipeline register
+always @(posedge clk_i or negedge rst_ni) //clock the outputs to the pipeline register
 begin
-	if(!reset_i)
+	if(!rst_ni)
 	begin
 		EXMEM_preg_wb <= 9'h0c;
 		EXMEM_preg_mem <= 3'b1;
 		EXMEM_preg_csr_addr <= 12'b0;
 		//{EXMEM_preg_pc, EXMEM_preg_aluout, EXMEM_preg_fpuout, EXMEM_preg_data2} <= 128'b0; //EXMEM_preg_data2 is unused
-		{EXMEM_preg_pc, EXMEM_preg_aluout, EXMEM_preg_fpuout} <= 96'b0;
+		{EXMEM_preg_pc, EXMEM_preg_aluout} <= 96'b0;
         EXMEM_preg_instr <= 32'b0;
         EXMEM_preg_memin <= 32'b0;
 		EXMEM_preg_rd <= 5'b0;
@@ -725,7 +633,6 @@ begin
 		EXMEM_preg_mret <= 1'b0;
 		EXMEM_preg_misaligned <= 1'b0;
 		EXMEM_preg_addr_bits <= 2'b0;
-        EXMEM_preg_fpuout <= 32'b0;
         EXMEM_preg_fflags <= 32'b0;
 	end
 
@@ -735,7 +642,7 @@ begin
         EXMEM_preg_mem <= 3'b1;
         EXMEM_preg_csr_addr <= 12'b0;
         //{EXMEM_preg_pc, EXMEM_preg_aluout, EXMEM_preg_fpuout, EXMEM_preg_data2} <= 128'b0; //EXMEM_preg_data2 is unused
-        {EXMEM_preg_pc, EXMEM_preg_aluout, EXMEM_preg_fpuout} <= 96'b0;
+        {EXMEM_preg_pc, EXMEM_preg_aluout} <= 64'b0;
         EXMEM_preg_instr <= 32'b0;
         EXMEM_preg_memin <= 32'b0;
         EXMEM_preg_rd <= 5'b0;
@@ -744,7 +651,6 @@ begin
         EXMEM_preg_mret <= 1'b0;
         EXMEM_preg_misaligned <= 1'b0;
         EXMEM_preg_addr_bits <= 2'b0;
-        EXMEM_preg_fpuout <= 32'b0;
         EXMEM_preg_fflags <= 32'b0;
 	end
 
@@ -756,7 +662,6 @@ begin
         EXMEM_preg_instr <= instr_EX;
 		//EXMEM_preg_data2 <= mux4_o_EX;
 		EXMEM_preg_aluout <= mux6_o_EX;
-        EXMEM_preg_fpuout <= fpu_out_EX;
         EXMEM_preg_memin <= data_o;
 		EXMEM_preg_mem <= {mem_EX[2:1],mem_wen_EX};
         EXMEM_preg_wb[8] <= wb_EX[8];
@@ -776,7 +681,7 @@ end
 //END EX STAGE-----------------------------------------------------------------------------
 
 load_store_unit LS_UNIT (.clk_i(clk_i),
-                         .reset_i(reset_i),
+                         .rst_ni(rst_ni),
                          .addr_i(aluout_EX),
                          .data_i(mux4_o_EX),
                          .length_EX_i(mem_length_EX),
@@ -800,7 +705,6 @@ assign data_wen_o  = mem_wen_EX;
 assign wb_MEM 	    = EXMEM_preg_wb;
 assign mem_MEM 	    = EXMEM_preg_mem;
 assign aluout_MEM   = EXMEM_preg_aluout;
-assign fpu_out_MEM  = EXMEM_preg_fpuout;
 //assign data2_MEM    = EXMEM_preg_data2; //Unused
 assign mux_ctrl_rb_MEM = wb_MEM[7];
 assign rd_MEM 	    = EXMEM_preg_rd;
@@ -811,11 +715,10 @@ assign imm_MEM 	    = EXMEM_preg_imm;
 assign csr_addr_MEM = EXMEM_preg_csr_addr;
 assign addr_bits_MEM = EXMEM_preg_addr_bits;
 assign csr_wen_MEM = wb_MEM[2];
-assign forward_fpu_alu_mem_sel = (IDEX_preg_wb[8] && EXMEM_preg_wb[8]) | (EXMEM_preg_wb[8] && wb_MEM[8])  ;
 
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-	if(!reset_i)
+	if(!rst_ni)
 	begin
 		MEMWB_preg_wb <= 9'h0c;
         MEMWB_preg_mem <= 3'b1;
@@ -826,7 +729,6 @@ begin
 		MEMWB_preg_memout <= 32'b0;
 		MEMWB_preg_memin <= 32'b0;
 		MEMWB_preg_aluout <= 32'b0;
-        MEMWB_preg_fpuout <= 32'b0;
 		MEMWB_preg_imm <= 32'b0;
 		MEMWB_preg_mret <= 1'b0;
         MEMWB_preg_fflags <= 32'b0;
@@ -844,7 +746,6 @@ begin
 		MEMWB_preg_memout <= 32'b0;
 		MEMWB_preg_memin <= 32'b0;
 		MEMWB_preg_aluout <= 32'b0;
-        MEMWB_preg_fpuout <= 32'b0;
 		MEMWB_preg_imm <= 32'b0;
 		MEMWB_preg_mret <= 1'b0;
         MEMWB_preg_dummy <= 1'b1;
@@ -862,7 +763,6 @@ begin
 		MEMWB_preg_csr_addr <= csr_addr_MEM;
 		MEMWB_preg_imm <= imm_MEM;
 		MEMWB_preg_aluout <= aluout_MEM;
-        MEMWB_preg_fpuout <= fpu_out_MEM;
 		MEMWB_preg_memout <= memout;
 		MEMWB_preg_memin <= memin_MEM;
 		MEMWB_preg_mret <= EXMEM_preg_mret;
@@ -885,7 +785,6 @@ assign instr_WB    = MEMWB_preg_instr; //for tracing purposes
 assign csr_addr_WB = MEMWB_preg_csr_addr;
 assign imm_WB      = MEMWB_preg_imm;
 assign aluout_WB   = MEMWB_preg_aluout;
-assign fpuout_WB   = MEMWB_preg_fpuout;
 assign mret_WB     = MEMWB_preg_mret;
 //assign nets
 assign mem_length_WB = wb_WB[1:0];
@@ -923,7 +822,7 @@ begin
 	else if (mux_ctrl_WB == 2'd2)
 		mux_o_WB = imm_WB;
     else
-        mux_o_WB = fpuout_WB;
+        mux_o_WB = 32'b0;
 end
 
 //END WB STAGE-----------------------------------------------------------------------------

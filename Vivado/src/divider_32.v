@@ -1,7 +1,7 @@
 module divider_32(
 	input clk,
 	input start,
-	input reset,
+	input rst_ni,
 	input [31:0] dividend,
 	input [31:0] divisor,
 	output rdy,
@@ -25,7 +25,7 @@ module divider_32(
 	reg [31:0] reg_R, reg_Q;
 
 
-	div_control div_control(start, clk, reset, mux_A_sel, mux_Rin_sel, reg_Rin_en, reg_Q_en, rdy);
+	div_control div_control(start, clk, rst_ni, mux_A_sel, mux_Rin_sel, reg_Rin_en, reg_Q_en, rdy);
 
 	div_block div_block(A, divisor, Rin, Rout, Q);
 
@@ -39,9 +39,9 @@ module divider_32(
 
 	assign div_out = {Q32, R};
 
-	always @ (posedge clk or negedge reset) begin
+	always @ (posedge clk or negedge rst_ni) begin
 
-	   if(!reset) begin
+	   if(!rst_ni) begin
 	       reg_R <= 32'd0;
            reg_Q <= 32'd0;
 	   end
@@ -104,7 +104,7 @@ endmodule
 module div_control(
 	input start,
 	input clk,
-	input reset,
+	input rst_ni,
 	output reg [4:0] mux_A_sel,
 	output reg mux_Rin_sel,
 	output reg reg_Rin_en,
@@ -118,8 +118,8 @@ module div_control(
 	reg [4:0] round_count;
 	reg start_count, rdy_b4_delay;
 
-	always @ (posedge clk or negedge reset) begin
-		if(!reset) begin
+	always @ (posedge clk or negedge rst_ni) begin
+		if(!rst_ni) begin
 			current_state <= 1'b0;
 			rdy <= 1'b0;	
 		end
@@ -129,8 +129,8 @@ module div_control(
 		end
 	end
 
-	always @ (posedge clk or negedge reset) begin
-		if(!reset)
+	always @ (posedge clk or negedge rst_ni) begin
+		if(!rst_ni)
 			round_count <= 5'b0;
 		else
 		begin

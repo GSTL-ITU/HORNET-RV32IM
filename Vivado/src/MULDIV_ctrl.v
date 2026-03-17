@@ -1,7 +1,7 @@
 module MULDIV_ctrl (
     input clk,
     input start,
-    input reset,
+    input rst_ni,
     input muldiv_sel,
     input [5:0] AB_status,
     input div_rdy,
@@ -31,8 +31,8 @@ module MULDIV_ctrl (
     //assign {Bm1, B0, B1, Am1, A0, A1} = AB_status; //The order doesn't match with the values below!!
     assign {Bm1, B1, B0, Am1, A1, A0} = AB_status;
 
-always @ (posedge clk or negedge reset) begin
-    if(!reset)
+always @ (posedge clk or negedge rst_ni) begin
+    if(!rst_ni)
         current_state <= IDLE;
     else
         current_state <= next_state;

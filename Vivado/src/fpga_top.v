@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 module fpga_top(input M100_clk_i,
-                input reset_i,
+                input rst_ni,
                 input rx_i,
                 output tx_o,
                 output clk_o,
@@ -137,7 +137,7 @@ generate
         assign wb_dat_i[i] = data_wb_dat_o;
         assign wb_sel_i[i] = data_wb_sel_o;
         if(i == 4)
-            assign wb_rst_i[i] = ~reset_i;
+            assign wb_rst_i[i] = ~rst_ni;
         else
             assign wb_rst_i[i] = ~reset;
         assign wb_clk_i[i] = clk_i;
@@ -190,10 +190,10 @@ assign data_wb_err_i = r_data_wb_err_i;
 assign data_wb_clk_i = clk_i;
 assign data_wb_rst_i = ~reset;
 
-assign reset = loader_reset & reset_i;
+assign reset = loader_reset & rst_ni;
 
 core_wb #(.reset_vector(32'h0))
-    core0(.reset_i(reset), //active-low reset
+    core0(.rst_ni(reset), //active-low reset
           .clk_i(clk_i),
           //Wishbone interface for data memory
           .data_wb_cyc_o(data_wb_cyc_o),

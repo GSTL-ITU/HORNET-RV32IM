@@ -1,5 +1,5 @@
 module barebones_wb_top(input clk_i,
-                        input reset_i,
+                        input rst_ni,
                         input meip_i,
                         input [15:0] fast_irq_i,
                         output irq_ack_o);
@@ -73,7 +73,7 @@ assign wb_we_i[0] = inst_wb_we_o;
 assign wb_adr_i[0] = inst_wb_adr_o;
 assign wb_dat_i[0] = inst_wb_dat_o;
 assign wb_sel_i[0] = inst_wb_sel_o;
-assign wb_rst_i[0] = ~reset_i;
+assign wb_rst_i[0] = ~rst_ni; // convert active low reset to active high for slaves
 assign wb_clk_i[0] = clk_i;
 assign inst_wb_dat_i = wb_dat_o[0];
 //assign inst_wb_ack_i = wb_ack_o[0];
@@ -90,7 +90,7 @@ generate
         assign wb_adr_i[i] = data_wb_adr_o;
         assign wb_dat_i[i] = data_wb_dat_o;
         assign wb_sel_i[i] = data_wb_sel_o;
-        assign wb_rst_i[i] = ~reset_i;
+        assign wb_rst_i[i] = ~rst_ni;
         assign wb_clk_i[i] = clk_i;
     end
 endgenerate
@@ -160,7 +160,7 @@ assign data_wb_ack_i = r_data_wb_ack_i;
 assign data_wb_stall_i = r_data_wb_stall_i;
 assign data_wb_err_i = r_data_wb_err_i;
 assign data_wb_clk_i = clk_i;
-assign data_wb_rst_i = ~reset_i;
+assign data_wb_rst_i = ~rst_ni;
 
 //Tracer signals
 wire [31:0] tr_mem_data, tr_mem_addr, tr_reg_data, tr_pc, tr_instr, fflags;
@@ -168,7 +168,7 @@ wire [4:0] tr_reg_addr;
 wire [1:0] tr_mem_len;
 wire tr_valid, tr_store, tr_load, tr_is_float;
 
-core_wb #(.reset_vector(reset_vector)) core0  (.reset_i(reset_i),
+core_wb #(.reset_vector(reset_vector)) core0  (.rst_ni(rst_ni),
                .clk_i(clk_i),
 
                //Wishbone interface for data memory

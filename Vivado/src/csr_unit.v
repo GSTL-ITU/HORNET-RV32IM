@@ -16,7 +16,7 @@ The module utilizes a finite state machine to realize the task.
 
 module csr_unit #(parameter reset_vector = 32'h0)
 (input clk_i,
-                input reset_i,
+                input rst_ni,
                 input [31:0] pc_i,
                 input [11:0] csr_r_addr_i, //CSR read address
                 input [11:0] csr_w_addr_i, //CSR write address
@@ -102,9 +102,9 @@ assign fflags = wb_fflags_i;
 assign fcsr = {24'b0, frm[2:0], fflags[4:0]};
 assign fpu_dyn_rm = frm[2:0];
 //state transitions are done on the rising edge
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-    if(!reset_i)
+    if(!rst_ni)
     begin
         STATE <= STAND_BY;
         ack_o <= 1'b0;
@@ -207,9 +207,9 @@ begin
     end
 end
 
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-    if(!reset_i)
+    if(!rst_ni)
         csr_reg_o <= 32'b0;
 
     else
@@ -262,9 +262,9 @@ begin
     end
 end
 //Counter for Zicntr extension
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-    if(!reset_i)
+    if(!rst_ni)
         counter <= 32'b0;
     else
         counter <= counter + 1;
@@ -302,9 +302,9 @@ begin
 end
 
 integer i;
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-    if(!reset_i)
+    if(!rst_ni)
         mip <= 32'b0;
     else
     begin
@@ -323,9 +323,9 @@ begin
 end
 
 //CSR assignments
-always @(posedge clk_i or negedge reset_i)
+always @(posedge clk_i or negedge rst_ni)
 begin
-    if(!reset_i)
+    if(!rst_ni)
     begin
         mepc <= 32'b0;
         mie <= 32'b0;
