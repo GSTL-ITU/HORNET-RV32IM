@@ -10,10 +10,10 @@ module fpga_top(input M100_clk_i,
                 output led1,led2,led4,
                 output trigger);
 
-parameter SYS_CLK_FREQ = 20000000;
+parameter SYS_CLK_FREQ = 40000000;
 parameter NUM_SLAVES = 6;
 parameter MEMORY_INIT = "memory_init.mem";
-parameter RAM_DEPTH = 120000;
+parameter RAM_DEPTH = 16384;
 
 wire temp;
 wire tx_o_tmp;
@@ -85,7 +85,7 @@ wire [NUM_SLAVES-1 : 0] wb_stall_o;
 wire [NUM_SLAVES-1 : 0] wb_ack_o;
 wire [31:0] wb_dat_o [NUM_SLAVES-1 : 0];
 wire [NUM_SLAVES-1 : 0] wb_err_o;
-wire [NUM_SLAVES-1 : 0] wb_rst_i;
+wire [NUM_SLAVES-1 : 0] wb_rst_ni;
 wire [NUM_SLAVES-1 : 0] wb_clk_i;
 reg [NUM_SLAVES-1 : 0] r_stb;
 
@@ -147,9 +147,9 @@ generate
 endgenerate
 
 //Register strobe signals
-always @(posedge wb_clk_i[0] or posedge wb_rst_i[0])
+always @(posedge wb_clk_i[0] or negedge wb_rst_ni[0])
 begin
-    if(wb_rst_i[0])
+    if(!wb_rst_ni[0])
         r_stb <= 0;
     else
         r_stb <= wb_stb_i;
@@ -195,7 +195,7 @@ assign data_wb_rst_ni = reset;
 
 
 core_wb #(.reset_vector(32'h0))
-    core0(.reset_i(reset), //active-low reset
+    core0(.rst_ni(reset), //active-low reset
           .clk_i(clk_i),
           //Wishbone interface for data memory
           .data_wb_cyc_o(data_wb_cyc_o),
@@ -208,7 +208,7 @@ core_wb #(.reset_vector(32'h0))
           .data_wb_ack_i(data_wb_ack_i),
           .data_wb_dat_i(data_wb_dat_i),
           .data_wb_err_i(data_wb_err_i),
-          .data_wb_rst_i(data_wb_rst_i),
+          .data_wb_rst_ni(data_wb_rst_ni),
           .data_wb_clk_i(data_wb_clk_i),
           //Wishbone interface for instruction memory
           .inst_wb_cyc_o(inst_wb_cyc_o),
