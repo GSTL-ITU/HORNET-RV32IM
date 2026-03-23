@@ -9,7 +9,7 @@ TEST="riscv_muldiv_arithmetic_test"
 PROJECT_ROOT=".."
 VIVADO_DIR="${PROJECT_ROOT}/Vivado/src"
 TB_FILE="${VIVADO_DIR}/sim_src/barebones_top_tb.v"
-ROM_GENERATOR="${PROJECT_ROOT}/test/rom_generator"
+ROM_GENERATOR="${PROJECT_ROOT}/rom_generator"
 
 verilator --Wno-fatal --binary --sv --timing \
   "${TB_FILE}" \
