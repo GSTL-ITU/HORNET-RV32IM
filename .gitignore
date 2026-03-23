@@ -1,0 +1,94 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+*.jou
+*.backup
+*.backup.jou
+*.backup.log
+.run_counter
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.exe
+*.hex
+*.data
+
+# Memory initialization files
+barebones_tb/*.mem
+fpga_top/*.mem
+riscv-dv/**/*.mem
+
+# Executables
+rom_generator
+rom_generator.exe
+inference_light_test
+inference_ligth_test
+
+# Verilator / simulation
+obj_dir/
+**/obj_dir/
+*.vcd
+*.fst
+*.wlf
+transcript
+
+# Run outputs
+out_*/
+**/out_*/
+*.csv
+trace.log
+simulation.log
+instruction.data
+final.bin
+final.data
+
+# riscv-dv generated outputs
+riscv-dv/docs/build/
+riscv-dv/euvm/build/
+riscv-dv/**/dsim/
+riscv-dv/**/debug/
+riscv-dv/**/obj/
+riscv-dv/**/sfe/
+riscv-dv/**/sir/
+
+# Optional: generated local program artifacts
+barebones_tb/*.elf
+barebones_tb/*.bin
+barebones_tb/*.data
+
+fpga_top/*.elf
+fpga_top/*.bin
+fpga_top/*.data
+
+# Vivado local/generated state
+.Xil/
+**/.Xil/
+.cache/
