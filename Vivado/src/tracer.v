@@ -18,7 +18,7 @@ wire is_float = 0; //We don't have an FPU, so we can just set this to 0. This is
 assign fpu_flags = 32'b0; //We don't have an FPU, so we can just set the flags to 0. This is required to avoid X's in the trace log.
 
 initial begin
-file_pointer = $fopen("/home/deniz/Hornet-RV32IM/HORNET-RV32IM/riscv-dv/trace.log", "w"); //The file is normally located in <vivado-dir>\HornetRISCV-vivado.sim\sim_1\behav\xsim, so let's use relative path to move it to the main folder
+file_pointer = $fopen("trace.log", "w"); //The file is normally located in <vivado-dir>\HornetRISCV-vivado.sim\sim_1\behav\xsim, so let's use relative path to move it to the main folder
     forever begin
         @(posedge valid); //This is required otherwise testbench ignores the update signal
         $fwrite(file_pointer, "0x%8h (0x%8h)", pc, instr);
