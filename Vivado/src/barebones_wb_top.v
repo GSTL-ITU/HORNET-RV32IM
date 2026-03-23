@@ -4,10 +4,8 @@ module barebones_wb_top(input clk_i,
                         input [15:0] fast_irq_i,
                         output irq_ack_o);
 
-parameter MEMORY_INIT = "memory_init_tb.mem";
-parameter RAM_DEPTH = 120000;
 parameter NUM_SLAVES = 4;
-parameter reset_vector = 32'h0000_0000; //The starting address for the program counter
+parameter reset_vector = 32'h0001_0000; //The starting address for the program counter
 wire mtip;
 
 //Wishbone master interface signals for core
@@ -55,17 +53,17 @@ reg [NUM_SLAVES-1 : 0] r_stb;
 wire [31:0] slave_adr_begin [NUM_SLAVES-1 : 0];
 wire [31:0] slave_adr_end [NUM_SLAVES-1 : 0];
 
-assign slave_adr_begin[0] = 32'h0000_0000;
-assign slave_adr_end[0] = 32'h1000_0000;
+assign slave_adr_begin[0] = 32'h0000_0000 + reset_vector;
+assign slave_adr_end[0] = 32'h0000_6FFF + reset_vector;
 
-assign slave_adr_begin[1] = 32'h0000_0000;
-assign slave_adr_end[1] = 32'h1000_0000;
+assign slave_adr_begin[1] = 32'h0000_0000 + reset_vector;
+assign slave_adr_end[1] = 32'h0000_7FFF + reset_vector;
 
-assign slave_adr_begin[2] = 32'h1000_8000;
-assign slave_adr_end[2] = 32'h1000_800F;
+assign slave_adr_begin[2] = 32'h0000_8000;
+assign slave_adr_end[2] = 32'h0000_800F;
 
-assign slave_adr_begin[3] = 32'h1000_8010;
-assign slave_adr_end[3] = 32'h1000_8010;
+assign slave_adr_begin[3] = 32'h0000_8010;
+assign slave_adr_end[3] = 32'h0000_8010;
 
 assign wb_cyc_i[0] = inst_wb_cyc_o;
 assign wb_stb_i[0] = inst_wb_stb_o && ((slave_adr_begin[0] <= wb_adr_i[0]) && (wb_adr_i[0] <= slave_adr_end[0])); //0 if out of instruction address range
@@ -166,7 +164,7 @@ assign data_wb_rst_ni = rst_ni;
 wire [31:0] tr_mem_data, tr_mem_addr, tr_reg_data, tr_pc, tr_instr;
 wire [4:0] tr_reg_addr;
 wire [1:0] tr_mem_len;
-wire tr_valid, tr_store, tr_load, tr_is_float;
+wire tr_valid, tr_store, tr_load;
 
 core_wb #(.reset_vector(reset_vector)) core0  (.rst_ni(rst_ni),
                .clk_i(clk_i),
@@ -214,8 +212,7 @@ core_wb #(.reset_vector(reset_vector)) core0  (.rst_ni(rst_ni),
                .tr_mem_len(tr_mem_len),
                .tr_valid(tr_valid),
                .tr_load(tr_load),
-               .tr_store(tr_store),
-               .tr_is_float(tr_is_float));
+               .tr_store(tr_store));
 
 
 tracer tracer(.clk_i(clk_i),
@@ -226,12 +223,11 @@ tracer tracer(.clk_i(clk_i),
                 .reg_data(tr_reg_data),
                 .is_load(tr_load),
                 .is_store(tr_store),
-                .is_float(tr_is_float),
                 .mem_size(tr_mem_len),
                 .mem_addr(tr_mem_addr),
                 .mem_data(tr_mem_data));
 
-memory_2rw_wb #(.RAM_DEPTH(RAM_DEPTH), .MEMORY_INIT(MEMORY_INIT)) memory(.port0_wb_cyc_i(wb_cyc_i[0]),
+memory_2rw_wb #(.ADDR_WIDTH(17)) memory(.port0_wb_cyc_i(wb_cyc_i[0]),
                                         .port0_wb_stb_i(wb_stb_i[0]),
                                         .port0_wb_we_i(wb_we_i[0]),
                                         .port0_wb_adr_i(wb_adr_i[0]),
@@ -257,8 +253,8 @@ memory_2rw_wb #(.RAM_DEPTH(RAM_DEPTH), .MEMORY_INIT(MEMORY_INIT)) memory(.port0_
                                         .port1_wb_rst_ni(wb_rst_ni[1]),
                                         .port1_wb_clk_i(wb_clk_i[1]));
 
-mtime_registers_wb #(.mtime_adr(32'h1000_8000),
-                     .mtimecmp_adr(32'h1000_8008))
+mtime_registers_wb #(.mtime_adr(32'h0000_8000),
+                     .mtimecmp_adr(32'h0000_8008))
                      mtime_regs(.wb_cyc_i(wb_cyc_i[2]),
                                 .wb_stb_i(wb_stb_i[2]),
                                 .wb_we_i(wb_we_i[2]),

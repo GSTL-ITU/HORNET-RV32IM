@@ -47,8 +47,6 @@ fpga_top/*.mem
 riscv-dv/**/*.mem
 
 # Executables
-rom_generator
-rom_generator.exe
 inference_light_test
 inference_ligth_test
 

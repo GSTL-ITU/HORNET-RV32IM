@@ -24,10 +24,10 @@ module core(input rst_ni, //active-low reset
             output [31:0] tr_reg_data, tr_pc, tr_instr,
             output [4:0]  tr_reg_addr,
             output [1:0]  tr_mem_len,
-            output        tr_valid, tr_load, tr_store, tr_is_float
+            output        tr_valid, tr_load, tr_store
             ); 
 
-parameter reset_vector = 32'h0; //pc is set to this address when a reset occurs. Overridden in core_wb and barebones_wb_top.
+parameter reset_vector = 32'h1000_0000; //pc is set to this address when a reset occurs. Overridden in core_wb and barebones_wb_top.
 
 //IF SIGNALS--------IF SIGNALS--------IF SIGNALS--------IF SIGNALS--------IF SIGNALS--------IF SIGNALS--------IF SIGNALS
 //mux signals
@@ -69,7 +69,6 @@ wire       ctrl_unit_wb_sign;
 wire       ctrl_unit_wb_rb_sel; // register bank select
 wire       ctrl_unit_IDEX_data1_sel;
 wire       ctrl_unit_IDEX_data2_sel;
-wire       ctrl_unit_wb_int_or_float;
 wire       ctrl_unit_illegal_instr, ctrl_unit_ecall, ctrl_unit_ebreak;
 
 //mux signals
@@ -132,7 +131,7 @@ wire [31:0] aluout_EX;
 wire [31:0] csr_alu_out;
 
 // exceptions
-wire [31:0] csr_float_i; // Can be connected to the CSR unit later for a proper privileged float implementation, but it's for the tracer only for now.
+// wire [31:0] csr_float_i; // Can be connected to the CSR unit later for a proper privileged float implementation, but it's for the tracer only for now.
 
 wire        stall_EX;
 wire        J, B, L; //jump, branch, load
@@ -833,7 +832,8 @@ always @(*) begin
         tr_mem_addr = aluout_WB; //Store instruction, address to be written to ALU
         is_load = 1'b0;
         is_store = 1'b1;
-    end else if (instr_WB[6:0] == 7'b0000111) begin //Float load instruction
+        
+    end /* else if (instr_WB[6:0] == 7'b0000111) begin //Float load instruction
         tr_mem_data = memout_WB; //Float load instruction, data to be read from memory
         tr_mem_addr = aluout_WB; //Float load instruction, address to be read from ALU
         is_load = 1'b1;
@@ -844,6 +844,7 @@ always @(*) begin
         is_load = 1'b0;
         is_store = 1'b1;
     end
+    */
     else begin
         tr_mem_data = 32'b0; //Branch instruction, no data to be written to memory
         tr_mem_addr = 32'b0; //Branch instruction, no address to be written to ALU
@@ -856,8 +857,6 @@ assign tr_mem_len = mem_length_WB;
 
 assign tr_load = is_load; //Load instruction
 assign tr_store = is_store; //Store instruction
-
-assign tr_is_float = mux_ctrl_rb_WB; //Uses float register bank
 
 assign tr_reg_data = {32{~rf_wen_WB}} & mux_o_WB; //Return this only if register file is being written to, otherwise it's 0, we should also invert the active low WE signal
 assign tr_reg_addr = {5{~rf_wen_WB}} & rd_WB; //Return this only if register file is being written to, otherwise it's 0, we should also invert the active low WE signal

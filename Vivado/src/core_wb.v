@@ -41,7 +41,7 @@ module core_wb(input rst_ni, //active-low reset
                output [31:0] tr_mem_data, tr_mem_addr, tr_reg_data, tr_pc, tr_instr,
                output [4:0]  tr_reg_addr,
                output [1:0]  tr_mem_len,
-               output        tr_valid, tr_load, tr_store, tr_is_float
+               output        tr_valid, tr_load, tr_store
             ); 
 parameter reset_vector = 32'h0;
 
@@ -95,8 +95,7 @@ core    #(.reset_vector(reset_vector))
         .tr_mem_len(tr_mem_len),
         .tr_valid(tr_valid),
         .tr_load(tr_load),
-        .tr_store(tr_store),
-        .tr_is_float(tr_is_float));
+        .tr_store(tr_store));
 
 reg data_cyc;
 always @(posedge data_wb_clk_i or negedge data_wb_rst_ni)

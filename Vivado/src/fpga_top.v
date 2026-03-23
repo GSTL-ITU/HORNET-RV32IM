@@ -10,10 +10,10 @@ module fpga_top(input M100_clk_i,
                 output led1,led2,led4,
                 output trigger);
 
-parameter SYS_CLK_FREQ = 40000000;
+parameter SYS_CLK_FREQ = 50000000;
 parameter NUM_SLAVES = 6;
-parameter MEMORY_INIT = "memory_init.mem";
-parameter RAM_DEPTH = 16384;
+// parameter MEMORY_INIT = "memory_init.mem";
+// parameter RAM_DEPTH = 120000;
 
 wire temp;
 wire tx_o_tmp;
@@ -92,23 +92,23 @@ reg [NUM_SLAVES-1 : 0] r_stb;
 wire [31:0] slave_adr_begin [NUM_SLAVES-1 : 0];
 wire [31:0] slave_adr_end [NUM_SLAVES-1 : 0];
 
-assign slave_adr_begin[0] = 32'h0000_0000;
-assign slave_adr_end[0] = 32'h1000_0000;
+assign slave_adr_begin[0] = 32'h1000_0000;
+assign slave_adr_end[0] = 32'h1F00_0000;
 
-assign slave_adr_begin[1] = 32'h0000_0000;
-assign slave_adr_end[1] = 32'h1000_0000;
+assign slave_adr_begin[1] = 32'h1000_0000;
+assign slave_adr_end[1] = 32'h1F00_0000;
 
-assign slave_adr_begin[2] = 32'h1000_8000;
-assign slave_adr_end[2] = 32'h1000_800F;
+assign slave_adr_begin[2] = 32'h2000_8000;
+assign slave_adr_end[2] = 32'h2000_800F;
 
-assign slave_adr_begin[3] = 32'h1000_8010;
-assign slave_adr_end[3] = 32'h1000_8013;
+assign slave_adr_begin[3] = 32'h2000_8010;
+assign slave_adr_end[3] = 32'h2000_8013;
 
-assign slave_adr_begin[4] = 32'h1000_8014;
-assign slave_adr_end[4] = 32'h1000_8014;
+assign slave_adr_begin[4] = 32'h2000_8014;
+assign slave_adr_end[4] = 32'h2000_8014;
 
-assign slave_adr_begin[5] = 32'h1000_8020;
-assign slave_adr_end[5] = 32'h1000_8023;
+assign slave_adr_begin[5] = 32'h2000_8020;
+assign slave_adr_end[5] = 32'h2000_8023;
 
 
 assign wb_cyc_i[0] = inst_wb_cyc_o;
@@ -194,7 +194,7 @@ assign data_wb_rst_ni = reset;
 
 
 
-core_wb #(.reset_vector(32'h0))
+core_wb #(.reset_vector(32'h1000_0000))
     core0(.rst_ni(reset), //active-low reset
           .clk_i(clk_i),
           //Wishbone interface for data memory
@@ -230,35 +230,34 @@ core_wb #(.reset_vector(32'h0))
           .fast_irq_i({15'b0,rx_irq_o}),
           .irq_ack_o(irq_ack_o));
 
-memory_2rw_wb #(.RAM_DEPTH(RAM_DEPTH), .MEMORY_INIT(MEMORY_INIT))
-    memory(.port0_wb_cyc_i(wb_cyc_i[0]),
-           .port0_wb_stb_i(wb_stb_i[0]),
-           .port0_wb_we_i(wb_we_i[0]),
-           .port0_wb_adr_i(wb_adr_i[0]),
-           .port0_wb_dat_i(wb_dat_i[0]),
-           .port0_wb_sel_i(wb_sel_i[0]),
-           .port0_wb_stall_o(wb_stall_o[0]),
-           .port0_wb_ack_o(wb_ack_o[0]),
-           .port0_wb_dat_o(wb_dat_o[0]),
-           .port0_wb_err_o(wb_err_o[0]),
-           .port0_wb_rst_ni(wb_rst_ni[0]),
-           .port0_wb_clk_i(wb_clk_i[0]),
+memory_2rw_wb #(.ADDR_WIDTH(17)) memory(.port0_wb_cyc_i(wb_cyc_i[0]),
+                                        .port0_wb_stb_i(wb_stb_i[0]),
+                                        .port0_wb_we_i(wb_we_i[0]),
+                                        .port0_wb_adr_i(wb_adr_i[0]),
+                                        .port0_wb_dat_i(wb_dat_i[0]),
+                                        .port0_wb_sel_i(wb_sel_i[0]),
+                                        .port0_wb_stall_o(wb_stall_o[0]),
+                                        .port0_wb_ack_o(wb_ack_o[0]),
+                                        .port0_wb_dat_o(wb_dat_o[0]),
+                                        .port0_wb_err_o(wb_err_o[0]),
+                                        .port0_wb_rst_ni(wb_rst_ni[0]),
+                                        .port0_wb_clk_i(wb_clk_i[0]),
 
-           .port1_wb_cyc_i(wb_cyc_i[1]),
-           .port1_wb_stb_i(wb_stb_i[1]),
-           .port1_wb_we_i(wb_we_i[1]),
-           .port1_wb_adr_i(wb_adr_i[1]),
-           .port1_wb_dat_i(wb_dat_i[1]),
-           .port1_wb_sel_i(wb_sel_i[1]),
-           .port1_wb_stall_o(wb_stall_o[1]),
-           .port1_wb_ack_o(wb_ack_o[1]),
-           .port1_wb_dat_o(wb_dat_o[1]),
-           .port1_wb_err_o(wb_err_o[1]),
-           .port1_wb_rst_ni(wb_rst_ni[1]),
-           .port1_wb_clk_i(wb_clk_i[1]));
+                                        .port1_wb_cyc_i(wb_cyc_i[1]),
+                                        .port1_wb_stb_i(wb_stb_i[1]),
+                                        .port1_wb_we_i(wb_we_i[1]),
+                                        .port1_wb_adr_i(wb_adr_i[1]),
+                                        .port1_wb_dat_i(wb_dat_i[1]),
+                                        .port1_wb_sel_i(wb_sel_i[1]),
+                                        .port1_wb_stall_o(wb_stall_o[1]),
+                                        .port1_wb_ack_o(wb_ack_o[1]),
+                                        .port1_wb_dat_o(wb_dat_o[1]),
+                                        .port1_wb_err_o(wb_err_o[1]),
+                                        .port1_wb_rst_ni(wb_rst_ni[1]),
+                                        .port1_wb_clk_i(wb_clk_i[1]));
 
-mtime_registers_wb #(.mtime_adr(32'h1000_8000),
-                     .mtimecmp_adr(32'h1000_8008))
+mtime_registers_wb #(.mtime_adr(32'h2000_8000),
+                     .mtimecmp_adr(32'h2000_8008))
     mtime_regs(.wb_cyc_i(wb_cyc_i[2]),
                .wb_stb_i(wb_stb_i[2]),
                .wb_we_i(wb_we_i[2]),

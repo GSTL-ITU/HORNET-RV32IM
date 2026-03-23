@@ -26,11 +26,11 @@ for (i = 0; i < uut.memory.RAM_DEPTH; i = i + 1) begin
     uut.memory.mem[i] = {uut.memory.DATA_WIDTH{1'b0}};  // Initialize to 0
 end
 #200;
-$readmemh("/home/deniz/Hornet-RV32IM/test/fpu_filter/fpu_filter.data",uut.memory.mem); //read data after reset, because reset initializes memory to 0
+$readmemh("/home/deniz/Hornet-RV32IM/HORNET-RV32IM/riscv-dv/instruction.data",uut.memory.mem); //read data after reset, because reset initializes memory to 0
 
 #25;
 rst_ni = 1'b1; //Wait a cycle so that the instruction memory is ready
-#1000000;
+#100000000;
 $finish;
 //interrupt signals, arbitrarily generated. uncomment if you need to.
 /*
@@ -44,6 +44,14 @@ $finish;
 #152;  meip_i=1'b1;
 #761;  meip_i=1'b1;
 #252;  meip_i=1'b1;*/
+end
+
+always @(posedge clk_i) begin
+    if (uut.core0.core0.CSR_UNIT.mcause == 32'h0000_000b) begin
+		#100; //wait for the next clock edge to ensure that the instruction after ecall is executed
+        $display("Simulation finished successfully!");
+        $finish;
+    end
 end
 
 //this always block imitates an interrupt controller. uncomment if you are using machine external interrupt.
