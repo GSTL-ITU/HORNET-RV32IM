@@ -62,9 +62,9 @@ fi
 echo "Simulation log saved to ${LOG_FILE}"
 
 if [ "$USE_RISCVDV" -eq 1 ]; then
-    python3 scripts/spike_log_to_trace_csv.py --log "out_$(date +%Y-%m-%d)/spike_sim/${TEST}_0.log" --csv spike_deneme.csv -f
-    python3 scripts/trace_to_csv.py -l trace.log -o deneme.csv
-    python3 scripts/compare.py deneme.csv spike_deneme.csv combined.csv
+    python3 scripts/spike_log_to_trace_csv.py --log "out_$(date +%Y-%m-%d)/spike_sim/${TEST}_0.log" --csv spike_out.csv -f
+    python3 scripts/trace_to_csv.py -l trace.log -o trace_out.csv
+    python3 scripts/compare.py trace_out.csv spike_out.csv comparison_out.csv
 
     # Add a counter to limit repetitions
     MAX_ITER=1
@@ -76,7 +76,7 @@ if [ "$USE_RISCVDV" -eq 1 ]; then
 
     COUNTER=$(cat "$COUNTER_FILE")
 
-    if python3 scripts/compare.py deneme.csv spike_deneme.csv combined.csv > /dev/null 2>&1; then
+    if python3 scripts/compare.py trace_out.csv spike_out.csv comparison_out.csv > /dev/null 2>&1; then
         if [ $? -ne 1 ]; then
             if [ "$COUNTER" -lt "$MAX_ITER" ]; then
                 COUNTER=$((COUNTER + 1))
