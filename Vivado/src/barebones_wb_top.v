@@ -227,7 +227,7 @@ tracer tracer(.clk_i(clk_i),
                 .mem_addr(tr_mem_addr),
                 .mem_data(tr_mem_data));
 
-memory_2rw_wb #(.ADDR_WIDTH(17)) memory(.port0_wb_cyc_i(wb_cyc_i[0]),
+memory_2rw_wb #(.ADDR_WIDTH(13)) memory(.port0_wb_cyc_i(wb_cyc_i[0]),
                                         .port0_wb_stb_i(wb_stb_i[0]),
                                         .port0_wb_we_i(wb_we_i[0]),
                                         .port0_wb_adr_i(wb_adr_i[0]),
