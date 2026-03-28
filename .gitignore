@@ -6,6 +6,7 @@ Thumbs.db
 *.swo
 .vscode/
 .idea/
+*.bak
 
 # Logs / temp
 *.log

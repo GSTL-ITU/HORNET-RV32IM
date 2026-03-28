@@ -8,9 +8,10 @@ OUTPUT_FORMAT("elf32-littleriscv", "elf32-littleriscv",
 OUTPUT_ARCH(riscv)
 MEMORY
 {
-    ROM(RX)   : ORIGIN = 0x00000000, LENGTH = 0x00050000
-    RAM(WAIL) : ORIGIN = 0x00050000, LENGTH = 0x0001FFFC
+    ROM(RX)   : ORIGIN = 0x00000000, LENGTH = 0x00007000
+    RAM(WAIL) : ORIGIN = 0x00007000, LENGTH = 0x00000FFC
 }
+
 
 ENTRY(_start)
 SEARCH_DIR("=/opt/riscv/riscv32-unknown-linux-gnu/lib32/ilp32d"); SEARCH_DIR("=/opt/riscv/riscv32-unknown-linux-gnu/lib32"); SEARCH_DIR("=/usr/local/lib32/ilp32d"); SEARCH_DIR("=/usr/local/lib32"); SEARCH_DIR("=/lib32/ilp32d"); SEARCH_DIR("=/lib32"); SEARCH_DIR("=/usr/lib32/ilp32d"); SEARCH_DIR("=/usr/lib32"); SEARCH_DIR("=/opt/riscv/riscv32-unknown-linux-gnu/lib"); SEARCH_DIR("=/usr/local/lib"); SEARCH_DIR("=/lib"); SEARCH_DIR("=/usr/lib");

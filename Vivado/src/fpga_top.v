@@ -1,329 +1,340 @@
 `timescale 1ns/1ps
 
-module fpga_top(input M100_clk_i,
-                input rst_ni,
-                input rx_i,
-                output tx_o,
-                output clk_o,
-//                output temp,
-                output stb,
-                output led1,led2,led4,
-                output trigger);
+module fpga_top(
+    input  wire M100_clk_i,
+    input  wire rst_ni,
+    input  wire rx_i,
+    output wire tx_o,
+    output wire clk_o,
+//    output wire temp,
+    output wire stb,
+    output wire led1,
+    output wire led2,
+    output wire led4,
+    output wire trigger
+);
 
-parameter SYS_CLK_FREQ = 50000000;
-parameter NUM_SLAVES = 6;
-// parameter MEMORY_INIT = "memory_init.mem";
-// parameter RAM_DEPTH = 120000;
+parameter SYS_CLK_FREQ = 40000000;
+parameter MEMORY_INIT  = "memory_init.mem";
+parameter RAM_DEPTH    = 16384;
+parameter reset_vector = 32'h0000_0000;
 
-wire temp;
-wire tx_o_tmp;
-wire loader_reset;
-wire [31:0] loader_reg_o;
-wire reset;
-wire irq_ack_o;
+localparam AXIL_DATA_W = 32;
+localparam AXIL_STRB_W = AXIL_DATA_W/8;
+localparam AXIL_ADDR_W = 32;
 
-assign reset = loader_reset & rst_ni;
+// 64 KiB RAM window at 0x0000_0000
+localparam RAM_ADDR_W  = 16;
 
-wire clk_i, locked;
-clk_wiz_0 clkwiz0
-(
-// Clock out ports
-       .clk_out1(clk_i),
-// Status and control signals
-       .reset(1'b0),
-       .locked(locked),
-// Clock in ports
-       .clk_in1(M100_clk_i)
+// GPIO register address, kept from original map style
+localparam GPIO_ADDR   = 32'h1000_8020;
+
+// -------------------------------------------------------------------------
+// Clocking
+// -------------------------------------------------------------------------
+wire clk_i;
+wire locked;
+
+clk_wiz_0 clkwiz0 (
+    .clk_out1(clk_i),
+    .reset(1'b0),
+    .locked(locked),
+    .clk_in1(M100_clk_i)
 );
 
 assign clk_o = clk_i;
 
-//Wishbone master interface signals for core
-wire data_wb_cyc_o;
-wire data_wb_stb_o;
-wire data_wb_we_o;
-wire [31:0] data_wb_adr_o;
-wire [31:0] data_wb_dat_o;
-wire [3:0] data_wb_sel_o;
-wire data_wb_stall_i;
-wire data_wb_ack_i;
-wire [31:0] data_wb_dat_i;
-wire data_wb_err_i;
-wire data_wb_rst_ni;
-wire data_wb_clk_i;
+// -------------------------------------------------------------------------
+// Unused preserved ports
+// -------------------------------------------------------------------------
+assign tx_o  = 1'b1;
+assign led1  = 1'b0;
+assign led2  = 1'b0;
+assign led4  = 1'b0;
 
-wire inst_wb_cyc_o;
-wire inst_wb_stb_o;
-wire inst_wb_we_o;
-wire [31:0] inst_wb_adr_o;
-wire [31:0] inst_wb_dat_o;
-wire [3:0] inst_wb_sel_o;
-wire inst_wb_stall_i;
-wire inst_wb_ack_i;
-wire [31:0] inst_wb_dat_i;
-wire inst_wb_err_i;
-wire inst_wb_rst_ni;
-wire inst_wb_clk_i;
+// -------------------------------------------------------------------------
+// Core AXI signals
+// -------------------------------------------------------------------------
+wire                     data_axi_awvalid;
+wire                     data_axi_awready;
+wire [AXIL_ADDR_W-1:0]   data_axi_awaddr;
+wire [2:0]               data_axi_awprot;
 
+wire                     data_axi_wvalid;
+wire                     data_axi_wready;
+wire [AXIL_DATA_W-1:0]   data_axi_wdata;
+wire [AXIL_STRB_W-1:0]   data_axi_wstrb;
 
+wire                     data_axi_bvalid;
+wire                     data_axi_bready;
+wire [1:0]               data_axi_bresp;
 
+wire                     data_axi_arvalid;
+wire                     data_axi_arready;
+wire [AXIL_ADDR_W-1:0]   data_axi_araddr;
+wire [2:0]               data_axi_arprot;
+
+wire                     data_axi_rvalid;
+wire                     data_axi_rready;
+wire [AXIL_DATA_W-1:0]   data_axi_rdata;
+wire [1:0]               data_axi_rresp;
+
+wire                     instr_axi_arvalid;
+wire                     instr_axi_arready;
+wire [AXIL_ADDR_W-1:0]   instr_axi_araddr;
+wire [2:0]               instr_axi_arprot;
+
+wire                     instr_axi_rvalid;
+wire                     instr_axi_rready;
+wire [AXIL_DATA_W-1:0]   instr_axi_rdata;
+wire [1:0]               instr_axi_rresp;
+
+wire irq_ack_o;
+
+// trace ports from core, unused here
+wire [31:0] tr_mem_data;
+wire [31:0] tr_mem_addr;
+wire [31:0] tr_reg_data;
+wire [31:0] tr_pc;
+wire [31:0] tr_instr;
+wire [4:0]  tr_reg_addr;
+wire [1:0]  tr_mem_len;
+wire        tr_valid;
+wire        tr_load;
+wire        tr_store;
+
+// -------------------------------------------------------------------------
+// Interrupts: only preserved shell, tied off
+// -------------------------------------------------------------------------
 wire mtip;
-wire rx_irq_o;
-wire [7:0] rx_byte;
+wire msip;
 
-assign tx_o = tx_o_tmp;
-assign temp = tx_o_tmp;
+assign mtip = 1'b0;
+assign msip = 1'b0;
 
-//Wishbone slave signals for peripherals
-wire [NUM_SLAVES-1 : 0] wb_cyc_i;
-wire [NUM_SLAVES-1 : 0] wb_stb_i;
-wire [NUM_SLAVES-1 : 0] wb_we_i;
-wire [31:0] wb_adr_i [NUM_SLAVES-1 : 0];
-wire [31:0] wb_dat_i [NUM_SLAVES-1 : 0];
-wire [3:0] wb_sel_i [NUM_SLAVES-1 : 0];
-wire [NUM_SLAVES-1 : 0] wb_stall_o;
-wire [NUM_SLAVES-1 : 0] wb_ack_o;
-wire [31:0] wb_dat_o [NUM_SLAVES-1 : 0];
-wire [NUM_SLAVES-1 : 0] wb_err_o;
-wire [NUM_SLAVES-1 : 0] wb_rst_ni;
-wire [NUM_SLAVES-1 : 0] wb_clk_i;
-reg [NUM_SLAVES-1 : 0] r_stb;
+// -------------------------------------------------------------------------
+// Core
+// -------------------------------------------------------------------------
+core_axi #(
+    .reset_vector(reset_vector)
+) core0 (
+    .rst_ni(rst_ni),
+    .clk_i(clk_i),
 
-wire [31:0] slave_adr_begin [NUM_SLAVES-1 : 0];
-wire [31:0] slave_adr_end [NUM_SLAVES-1 : 0];
+    // AXI4-Lite data port
+    .data_axi_awvalid_o(data_axi_awvalid),
+    .data_axi_awready_i(data_axi_awready),
+    .data_axi_awaddr_o (data_axi_awaddr),
+    .data_axi_awprot_o (data_axi_awprot),
 
-assign slave_adr_begin[0] = 32'h1000_0000;
-assign slave_adr_end[0] = 32'h1F00_0000;
+    .data_axi_wvalid_o (data_axi_wvalid),
+    .data_axi_wready_i (data_axi_wready),
+    .data_axi_wdata_o  (data_axi_wdata),
+    .data_axi_wstrb_o  (data_axi_wstrb),
 
-assign slave_adr_begin[1] = 32'h1000_0000;
-assign slave_adr_end[1] = 32'h1F00_0000;
+    .data_axi_bvalid_i (data_axi_bvalid),
+    .data_axi_bready_o (data_axi_bready),
+    .data_axi_bresp_i  (data_axi_bresp),
 
-assign slave_adr_begin[2] = 32'h2000_8000;
-assign slave_adr_end[2] = 32'h2000_800F;
+    .data_axi_arvalid_o(data_axi_arvalid),
+    .data_axi_arready_i(data_axi_arready),
+    .data_axi_araddr_o (data_axi_araddr),
+    .data_axi_arprot_o (data_axi_arprot),
 
-assign slave_adr_begin[3] = 32'h2000_8010;
-assign slave_adr_end[3] = 32'h2000_8013;
+    .data_axi_rvalid_i (data_axi_rvalid),
+    .data_axi_rready_o (data_axi_rready),
+    .data_axi_rdata_i  (data_axi_rdata),
+    .data_axi_rresp_i  (data_axi_rresp),
 
-assign slave_adr_begin[4] = 32'h2000_8014;
-assign slave_adr_end[4] = 32'h2000_8014;
+    // AXI4-Lite instruction port
+    .instr_axi_arvalid_o(instr_axi_arvalid),
+    .instr_axi_arready_i(instr_axi_arready),
+    .instr_axi_araddr_o (instr_axi_araddr),
+    .instr_axi_arprot_o (instr_axi_arprot),
 
-assign slave_adr_begin[5] = 32'h2000_8020;
-assign slave_adr_end[5] = 32'h2000_8023;
+    .instr_axi_rvalid_i (instr_axi_rvalid),
+    .instr_axi_rready_o (instr_axi_rready),
+    .instr_axi_rdata_i  (instr_axi_rdata),
+    .instr_axi_rresp_i  (instr_axi_rresp),
 
+    // Interrupts
+    .meip_i(1'b0),
+    .mtip_i(mtip),
+    .msip_i(msip),
+    .fast_irq_i(16'b0),
+    .irq_ack_o(irq_ack_o),
 
-assign wb_cyc_i[0] = inst_wb_cyc_o;
-assign wb_stb_i[0] = inst_wb_stb_o;
-assign wb_we_i[0] = inst_wb_we_o;
-assign wb_adr_i[0] = inst_wb_adr_o;
-assign wb_dat_i[0] = inst_wb_dat_o;
-assign wb_sel_i[0] = inst_wb_sel_o;
-assign wb_rst_ni[0] = rst_ni;
-assign wb_clk_i[0] = clk_i;
-assign inst_wb_dat_i = wb_dat_o[0];
-assign inst_wb_ack_i = wb_ack_o[0];
-assign inst_wb_stall_i = wb_stall_o[0];
-assign inst_wb_err_i = wb_err_o[0];
-assign inst_wb_rst_ni = rst_ni;
-assign inst_wb_clk_i = clk_i;
+    // Trace
+    .tr_mem_data(tr_mem_data),
+    .tr_mem_addr(tr_mem_addr),
+    .tr_reg_data(tr_reg_data),
+    .tr_pc(tr_pc),
+    .tr_instr(tr_instr),
+    .tr_reg_addr(tr_reg_addr),
+    .tr_mem_len(tr_mem_len),
+    .tr_valid(tr_valid),
+    .tr_load(tr_load),
+    .tr_store(tr_store)
+);
 
-assign stb = wb_stb_i[3];
+// -------------------------------------------------------------------------
+// Data-port decode: RAM or GPIO
+// -------------------------------------------------------------------------
+wire gpio_wr_sel;
+wire gpio_rd_sel;
+wire ram_wr_sel;
+wire ram_rd_sel;
 
-genvar i;
-generate
-    for (i = 1; i<NUM_SLAVES ;i=i+1)
-    begin
-        assign wb_cyc_i[i] = data_wb_cyc_o;
-        assign wb_stb_i[i] = data_wb_stb_o & ((slave_adr_begin[i] <= wb_adr_i[i]) && (wb_adr_i[i] <= slave_adr_end[i]));
-        assign wb_we_i[i] = data_wb_we_o;
-        assign wb_adr_i[i] = data_wb_adr_o;
-        assign wb_dat_i[i] = data_wb_dat_o;
-        assign wb_sel_i[i] = data_wb_sel_o;
-        if(i == 4)
-            assign wb_rst_ni[i] = rst_ni;
-        else
-            assign wb_rst_ni[i] = reset;
-        assign wb_clk_i[i] = clk_i;
+assign gpio_wr_sel = (data_axi_awaddr == GPIO_ADDR);
+assign gpio_rd_sel = (data_axi_araddr == GPIO_ADDR);
+
+assign ram_wr_sel  = ~gpio_wr_sel;
+assign ram_rd_sel  = ~gpio_rd_sel;
+
+// -------------------------------------------------------------------------
+// RAM-side AXI signals
+// -------------------------------------------------------------------------
+wire                   ram_b_awready;
+wire                   ram_b_wready;
+wire [1:0]             ram_b_bresp;
+wire                   ram_b_bvalid;
+wire                   ram_b_arready;
+wire [AXIL_DATA_W-1:0] ram_b_rdata;
+wire [1:0]             ram_b_rresp;
+wire                   ram_b_rvalid;
+
+// -------------------------------------------------------------------------
+// Simple GPIO AXI-lite register
+//   write/read at GPIO_ADDR
+//   bit 0 drives trigger
+// -------------------------------------------------------------------------
+reg        gpio_trigger_reg = 1'b0;
+reg        gpio_bvalid_reg  = 1'b0;
+reg        gpio_rvalid_reg  = 1'b0;
+reg [31:0] gpio_rdata_reg   = 32'b0;
+
+wire gpio_write_fire;
+wire gpio_read_fire;
+
+assign gpio_write_fire = gpio_wr_sel &&
+                         data_axi_awvalid &&
+                         data_axi_wvalid &&
+                         (!gpio_bvalid_reg);
+
+assign gpio_read_fire  = gpio_rd_sel &&
+                         data_axi_arvalid &&
+                         (!gpio_rvalid_reg);
+
+always @(posedge clk_i) begin
+    if (!rst_ni) begin
+        gpio_trigger_reg <= 1'b0;
+        gpio_bvalid_reg  <= 1'b0;
+        gpio_rvalid_reg  <= 1'b0;
+        gpio_rdata_reg   <= 32'b0;
+    end else begin
+        if (gpio_write_fire) begin
+            if (data_axi_wstrb[0]) begin
+                gpio_trigger_reg <= data_axi_wdata[0];
+            end
+            gpio_bvalid_reg <= 1'b1;
+        end else if (gpio_bvalid_reg && data_axi_bready) begin
+            gpio_bvalid_reg <= 1'b0;
+        end
+
+        if (gpio_read_fire) begin
+            gpio_rdata_reg  <= {31'b0, gpio_trigger_reg};
+            gpio_rvalid_reg <= 1'b1;
+        end else if (gpio_rvalid_reg && data_axi_rready) begin
+            gpio_rvalid_reg <= 1'b0;
+        end
     end
-endgenerate
-
-//Register strobe signals
-always @(posedge wb_clk_i[0] or negedge wb_rst_ni[0])
-begin
-    if(!wb_rst_ni[0])
-        r_stb <= 0;
-    else
-        r_stb <= wb_stb_i;
 end
 
-reg [31:0] r_data_wb_dat_i;
-reg r_data_wb_err_i;
-reg r_data_wb_stall_i;
-reg r_data_wb_ack_i;
-reg valid;
-integer k;
-always @(*)
-begin
-    valid = 1'b0;
-    for (k = 1; k < NUM_SLAVES && valid != 1'b1; k = k+1)
-    begin
-        if(r_stb[k])
-        begin
-            r_data_wb_dat_i = wb_dat_o[k];
-            r_data_wb_stall_i = wb_stall_o[k];
-            r_data_wb_err_i = wb_err_o[k];
-            r_data_wb_ack_i = wb_ack_o[k];
-            valid = 1'b1;
-        end
-        else
-        begin
-            r_data_wb_dat_i = 32'b0;
-            r_data_wb_stall_i = 1'b0;
-            r_data_wb_err_i = 1'b0;
-            r_data_wb_ack_i = 1'b0;
-        end
-    end
-end
+assign trigger = gpio_trigger_reg;
 
+// expose a simple strobe indicator on GPIO access
+assign stb = gpio_wr_sel | gpio_rd_sel;
 
-assign data_wb_dat_i = r_data_wb_dat_i;
-assign data_wb_ack_i = r_data_wb_ack_i;
-assign data_wb_stall_i = r_data_wb_stall_i;
-assign data_wb_err_i = r_data_wb_err_i;
-assign data_wb_clk_i = clk_i;
-assign data_wb_rst_ni = reset;
+// -------------------------------------------------------------------------
+// Data-port response mux
+// -------------------------------------------------------------------------
+assign data_axi_awready = gpio_wr_sel ? (~gpio_bvalid_reg) : ram_b_awready;
+assign data_axi_wready  = gpio_wr_sel ? (~gpio_bvalid_reg) : ram_b_wready;
+assign data_axi_bvalid  = gpio_wr_sel ? gpio_bvalid_reg     : ram_b_bvalid;
+assign data_axi_bresp   = gpio_wr_sel ? 2'b00               : ram_b_bresp;
 
+assign data_axi_arready = gpio_rd_sel ? (~gpio_rvalid_reg) : ram_b_arready;
+assign data_axi_rvalid  = gpio_rd_sel ? gpio_rvalid_reg    : ram_b_rvalid;
+assign data_axi_rdata   = gpio_rd_sel ? gpio_rdata_reg     : ram_b_rdata;
+assign data_axi_rresp   = gpio_rd_sel ? 2'b00              : ram_b_rresp;
 
+// -------------------------------------------------------------------------
+// Dual-port AXI-Lite RAM
+//   Port A = instruction fetch
+//   Port B = data RAM accesses only
+// -------------------------------------------------------------------------
+axi4l_ram #(
+    .DATA_W(AXIL_DATA_W),
+    .AXIL_ADDR_W(AXIL_ADDR_W),
+    .STRB_W(AXIL_STRB_W),
+    .ADDR_W(RAM_ADDR_W),
+    .PIPELINE_OUTPUT(0)
+) memory (
+    // Port A - instruction
+    .a_clk(clk_i),
+    .a_rst(~rst_ni),
 
-core_wb #(.reset_vector(32'h1000_0000))
-    core0(.rst_ni(reset), //active-low reset
-          .clk_i(clk_i),
-          //Wishbone interface for data memory
-          .data_wb_cyc_o(data_wb_cyc_o),
-          .data_wb_stb_o(data_wb_stb_o),
-          .data_wb_we_o(data_wb_we_o),
-          .data_wb_adr_o(data_wb_adr_o),
-          .data_wb_dat_o(data_wb_dat_o),
-          .data_wb_sel_o(data_wb_sel_o),
-          .data_wb_stall_i(data_wb_stall_i),
-          .data_wb_ack_i(data_wb_ack_i),
-          .data_wb_dat_i(data_wb_dat_i),
-          .data_wb_err_i(data_wb_err_i),
-          .data_wb_rst_ni(data_wb_rst_ni),
-          .data_wb_clk_i(data_wb_clk_i),
-          //Wishbone interface for instruction memory
-          .inst_wb_cyc_o(inst_wb_cyc_o),
-          .inst_wb_stb_o(inst_wb_stb_o),
-          .inst_wb_we_o(inst_wb_we_o),
-          .inst_wb_adr_o(inst_wb_adr_o),
-          .inst_wb_dat_o(inst_wb_dat_o),
-          .inst_wb_sel_o(inst_wb_sel_o),
-          //.inst_wb_stall_i(inst_wb_stall_i),
-          //.inst_wb_ack_i(inst_wb_ack_i),
-          .inst_wb_dat_i(inst_wb_dat_i),
-          .inst_wb_err_i(inst_wb_err_i),
-          //.inst_wb_rst_i(inst_wb_rst_i),
-          //.inst_wb_clk_i(inst_wb_clk_i),
-          //Interrupts
-          .meip_i(1'b0),
-          .mtip_i(mtip),
-          .msip_i(1'b0),
-          .fast_irq_i({15'b0,rx_irq_o}),
-          .irq_ack_o(irq_ack_o));
+    .s_axil_a_awaddr ({AXIL_ADDR_W{1'b0}}),
+    .s_axil_a_awprot (3'b000),
+    .s_axil_a_awvalid(1'b0),
+    .s_axil_a_awready(),
 
-memory_2rw_wb #(.ADDR_WIDTH(17)) memory(.port0_wb_cyc_i(wb_cyc_i[0]),
-                                        .port0_wb_stb_i(wb_stb_i[0]),
-                                        .port0_wb_we_i(wb_we_i[0]),
-                                        .port0_wb_adr_i(wb_adr_i[0]),
-                                        .port0_wb_dat_i(wb_dat_i[0]),
-                                        .port0_wb_sel_i(wb_sel_i[0]),
-                                        .port0_wb_stall_o(wb_stall_o[0]),
-                                        .port0_wb_ack_o(wb_ack_o[0]),
-                                        .port0_wb_dat_o(wb_dat_o[0]),
-                                        .port0_wb_err_o(wb_err_o[0]),
-                                        .port0_wb_rst_ni(wb_rst_ni[0]),
-                                        .port0_wb_clk_i(wb_clk_i[0]),
+    .s_axil_a_wdata  ({AXIL_DATA_W{1'b0}}),
+    .s_axil_a_wstrb  ({AXIL_STRB_W{1'b0}}),
+    .s_axil_a_wvalid (1'b0),
+    .s_axil_a_wready (),
 
-                                        .port1_wb_cyc_i(wb_cyc_i[1]),
-                                        .port1_wb_stb_i(wb_stb_i[1]),
-                                        .port1_wb_we_i(wb_we_i[1]),
-                                        .port1_wb_adr_i(wb_adr_i[1]),
-                                        .port1_wb_dat_i(wb_dat_i[1]),
-                                        .port1_wb_sel_i(wb_sel_i[1]),
-                                        .port1_wb_stall_o(wb_stall_o[1]),
-                                        .port1_wb_ack_o(wb_ack_o[1]),
-                                        .port1_wb_dat_o(wb_dat_o[1]),
-                                        .port1_wb_err_o(wb_err_o[1]),
-                                        .port1_wb_rst_ni(wb_rst_ni[1]),
-                                        .port1_wb_clk_i(wb_clk_i[1]));
+    .s_axil_a_bresp  (),
+    .s_axil_a_bvalid (),
+    .s_axil_a_bready (1'b0),
 
-mtime_registers_wb #(.mtime_adr(32'h2000_8000),
-                     .mtimecmp_adr(32'h2000_8008))
-    mtime_regs(.wb_cyc_i(wb_cyc_i[2]),
-               .wb_stb_i(wb_stb_i[2]),
-               .wb_we_i(wb_we_i[2]),
-               .wb_adr_i(wb_adr_i[2]),
-               .wb_dat_i(wb_dat_i[2]),
-               .wb_sel_i(wb_sel_i[2]),
-               .wb_stall_o(wb_stall_o[2]),
-               .wb_ack_o(wb_ack_o[2]),
-               .wb_dat_o(wb_dat_o[2]),
-               .wb_err_o(wb_err_o[2]),
-               .wb_rst_ni(wb_rst_ni[2]),
-               .wb_clk_i(wb_clk_i[2]),
-               .mtip_o(mtip));
+    .s_axil_a_araddr (instr_axi_araddr),
+    .s_axil_a_arprot (instr_axi_arprot),
+    .s_axil_a_arvalid(instr_axi_arvalid),
+    .s_axil_a_arready(instr_axi_arready),
 
-uart_wb #(.SYS_CLK_FREQ(SYS_CLK_FREQ), .BAUD(115200))
-    uart0(.wb_cyc_i(wb_cyc_i[3]),
-          .wb_stb_i(wb_stb_i[3]),
-          .wb_we_i(wb_we_i[3]),
-          .wb_adr_i(wb_adr_i[3]),
-          .wb_dat_i(wb_dat_i[3]),
-          .wb_sel_i(wb_sel_i[3]),
-          .wb_stall_o(wb_stall_o[3]),
-          .wb_ack_o(wb_ack_o[3]),
-          .wb_dat_o(wb_dat_o[3]),
-          .wb_err_o(wb_err_o[3]),
-          .wb_rst_ni(wb_rst_ni[3]),
-          .wb_clk_i(wb_clk_i[3]),
+    .s_axil_a_rdata  (instr_axi_rdata),
+    .s_axil_a_rresp  (instr_axi_rresp),
+    .s_axil_a_rvalid (instr_axi_rvalid),
+    .s_axil_a_rready (instr_axi_rready),
 
-          .rx_i(rx_i),
-          .tx_o(tx_o_tmp),
-          .rx_byte_o(rx_byte),
-          .rx_irq_o(rx_irq_o));
+    // Port B - data RAM only
+    .b_clk(clk_i),
+    .b_rst(~rst_ni),
 
-loader_wb #(.SYS_CLK_FREQ(SYS_CLK_FREQ))
-    loader0(.wb_cyc_i(wb_cyc_i[4]),
-            .wb_stb_i(wb_stb_i[4]),
-            .wb_we_i(wb_we_i[4]),
-            .wb_adr_i(wb_adr_i[4]),
-            .wb_dat_i(wb_dat_i[4]),
-            .wb_sel_i(wb_sel_i[4]),
-            .wb_stall_o(wb_stall_o[4]),
-            .wb_ack_o(wb_ack_o[4]),
-            .wb_dat_o(wb_dat_o[4]),
-            .wb_err_o(wb_err_o[4]),
-            .wb_rst_ni(wb_rst_ni[4]),
-            .wb_clk_i(wb_clk_i[4]),
+    .s_axil_b_awaddr (data_axi_awaddr),
+    .s_axil_b_awprot (data_axi_awprot),
+    .s_axil_b_awvalid(data_axi_awvalid && ram_wr_sel),
+    .s_axil_b_awready(ram_b_awready),
 
-            .uart_rx_irq(rx_irq_o),
-            .uart_rx_byte(rx_byte),
-            .reset_o(loader_reset),
-            .led1(led1), .led2(led2), .led4(led4));
+    .s_axil_b_wdata  (data_axi_wdata),
+    .s_axil_b_wstrb  (data_axi_wstrb),
+    .s_axil_b_wvalid (data_axi_wvalid && ram_wr_sel),
+    .s_axil_b_wready (ram_b_wready),
 
-gpio_wb   gpio(.wb_cyc_i(wb_cyc_i[5]),
-          .wb_stb_i(wb_stb_i[5]),
-          .wb_we_i(wb_we_i[5]),
-          .wb_adr_i(wb_adr_i[5]),
-          .wb_dat_i(wb_dat_i[5]),
-          .wb_sel_i(wb_sel_i[5]),
-          .wb_stall_o(wb_stall_o[5]),
-          .wb_ack_o(wb_ack_o[5]),
-          .wb_dat_o(wb_dat_o[5]),
-          .wb_err_o(wb_err_o[5]),
-          .wb_rst_ni(wb_rst_ni[5]),
-          .wb_clk_i(wb_clk_i[5]),
-          .trigger_o(trigger)
-          );
+    .s_axil_b_bresp  (ram_b_bresp),
+    .s_axil_b_bvalid (ram_b_bvalid),
+    .s_axil_b_bready (data_axi_bready && ram_wr_sel),
 
+    .s_axil_b_araddr (data_axi_araddr),
+    .s_axil_b_arprot (data_axi_arprot),
+    .s_axil_b_arvalid(data_axi_arvalid && ram_rd_sel),
+    .s_axil_b_arready(ram_b_arready),
+
+    .s_axil_b_rdata  (ram_b_rdata),
+    .s_axil_b_rresp  (ram_b_rresp),
+    .s_axil_b_rvalid (ram_b_rvalid),
+    .s_axil_b_rready (data_axi_rready && ram_rd_sel)
+);
 
 endmodule

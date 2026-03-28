@@ -14,6 +14,7 @@ module core(input rst_ni, //active-low reset
             input  [31:0] instr_i,              //instruction input
             output [31:0] instr_addr_o,         //instruction address output
             input         instr_access_fault_i, //instruction access fault exception signal
+            input         instr_stall_i,        //instruction memory stall input. pipeline is stalled when an instruction fetch request is answered with a stall.
 
             input         meip_i, mtip_i, msip_i, //interrupts
             input  [15:0] fast_irq_i,
@@ -286,7 +287,7 @@ assign mux4_o_IF = mux4_ctrl_IF ? mux3_o_IF : mux1_o_IF;
 assign pc_i = rst_ni ? mux4_o_IF : reset_vector;
 assign instr_addr_o = pc_i;
 
-assign stall_IF = hazard_stall | muldiv_stall_EX | misaligned_access | data_stall_i | csr_stall;
+assign stall_IF = hazard_stall | muldiv_stall_EX | misaligned_access | data_stall_i | csr_stall | instr_stall_i; //TODO: move csr stall below
 
 always @(posedge clk_i or negedge rst_ni)
 begin

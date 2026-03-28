@@ -11,10 +11,8 @@ VIVADO_DIR="${PROJECT_ROOT}/Vivado/src"
 TB_FILE="${VIVADO_DIR}/sim_src/barebones_top_tb.v"
 ROM_GENERATOR="${PROJECT_ROOT}/../rom_generator"
 
-verilator --Wno-fatal --binary --sv --timing \
-  "${TB_FILE}" \
-  -I"${VIVADO_DIR}" \
-  --top-module barebones_top_tb
+verilator --Wno-fatal   --binary --sv --timing /home/deniz/Hornet-RV32IM/deneme/HORNET-RV32IM/Vivado/src/sim_src/barebones_top_axi4l_tb.v -I/home/deniz/Hornet-RV32IM/deneme/HORNET-RV32IM/Vivado/src   --top-module barebones_top_axi4l_tb
+
 
 if [ "$USE_RISCVDV" -eq 1 ]; then
     python3.11 run.py --verbose --test "${TEST}" --simulator pyflow --isa rv32im --mabi ilp32 --sim_opts="" # --seed=2079547102
@@ -49,7 +47,7 @@ if [ "$USE_RISCVDV" -eq 1 ]; then
 fi
 
 cd .. || exit 1
-./obj_dir/Vbarebones_top_tb
+./obj_dir/Vbarebones_top_axi4l_tb 
 
 # Check exit status
 if [ $? -eq 0 ]; then
