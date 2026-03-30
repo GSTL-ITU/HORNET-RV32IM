@@ -93,7 +93,7 @@ initial $readmemh("bootloader.mem",mem,7488,8191);
 
   // Memory Write Block Port 0
   // Write Operation : When we0 = 0, cs0 = 0
-always @ (posedge clk0)
+/*always @ (posedge clk0)
 begin
     if ( !cs0 && !we0 )
     begin
@@ -106,7 +106,7 @@ begin
         if (wmask0[3])
             mem[addr0][31:24] = din0[31:24];
     end
-end
+end*/
 
   // Memory Read Block Port 0
   // Read Operation : When we0 = 1, cs0 = 0
@@ -120,24 +120,29 @@ end
   // Write Operation : When we1 = 0, cs1 = 0
 always @ (posedge clk1)
 begin
-    if ( !cs1 && !we1 ) begin
-        if (wmask1[0])
-            mem[addr1][7:0] = din1[7:0];
-        if (wmask1[1])
-            mem[addr1][15:8] = din1[15:8];
-        if (wmask1[2])
-            mem[addr1][23:16] = din1[23:16];
-        if (wmask1[3])
-            mem[addr1][31:24] = din1[31:24];
+    if ( !cs1 ) begin
+        if(!we1) begin
+            if (wmask1[0])
+                mem[addr1][7:0] = din1[7:0];
+            if (wmask1[1])
+                mem[addr1][15:8] = din1[15:8];
+            if (wmask1[2])
+                mem[addr1][23:16] = din1[23:16];
+            if (wmask1[3])
+                mem[addr1][31:24] = din1[31:24];
+        end
+        else begin
+            port1_wb_dat_o <= mem[addr1];
+        end
     end
 end
 
   // Memory Read Block Port 1
   // Read Operation : When we1 = 1, cs1 = 0
-always @ (posedge clk1)
+/*always @ (posedge clk1)
 begin : MEM_READ1
     if (!cs1 && we1)
         port1_wb_dat_o <= mem[addr1];
-end
+end*/
 
 endmodule
