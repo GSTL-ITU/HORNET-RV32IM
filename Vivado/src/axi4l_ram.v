@@ -6,7 +6,7 @@ module axi4l_ram #
     parameter DATA_W = 32,
     parameter AXIL_ADDR_W = 32,
     parameter STRB_W = (DATA_W/8),
-    parameter ADDR_W = 16,
+    parameter ADDR_W = 19,
     parameter PIPELINE_OUTPUT = 0
 )
 (

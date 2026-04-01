@@ -301,7 +301,8 @@ begin
 
 	else if(take_branch | csr_if_flush) //flush IF
 	begin
-		{IFID_preg_pc, IFID_preg_instr} <= 64'h13;
+		IFID_preg_pc <= IFID_preg_pc;
+        IFID_preg_instr <= 32'h13; //nop
 		pc_o <= pc_i;
 		IFID_preg_dummy <= 1'b1;
 	end
@@ -312,7 +313,8 @@ begin
 		begin
             if(stall_IF)
             begin
-                {IFID_preg_pc, IFID_preg_instr} <= 64'h13;
+                IFID_preg_pc <= IFID_preg_pc;
+                IFID_preg_instr <= 32'h13; //nop
                 pc_o <= pc_i;
                 IFID_preg_dummy <= 1'b1;                
             end
@@ -447,21 +449,26 @@ begin
         {IDEX_preg_data1_sel, IDEX_preg_data2_sel} <= 2'b0;
 	end
 
+    else if(data_stall_i)
+    begin
+        // HOLD ID/EX exactly as-is while data memory is stalled
+        // no assignments
+    end
+
     else if(stall_EX || misaligned_access)
     begin
         if(IDEX_preg_rs1 == 5'b0)
-			IDEX_preg_data1 <= 32'b0;
-		else
-			IDEX_preg_data1 <= register_bank[IDEX_preg_rs1];
+            IDEX_preg_data1 <= 32'b0;
+        else
+            IDEX_preg_data1 <= register_bank[IDEX_preg_rs1];
 
-		if(IDEX_preg_rs2 == 5'b0)
-			IDEX_preg_data2 <= 32'b0;
-		else
-			IDEX_preg_data2 <= register_bank[IDEX_preg_rs2];
+        if(IDEX_preg_rs2 == 5'b0)
+            IDEX_preg_data2 <= 32'b0;
+        else
+            IDEX_preg_data2 <= register_bank[IDEX_preg_rs2];
 
         if(misaligned_access)
             IDEX_preg_misaligned <= 1'b1;
-
     end
 
     else
@@ -631,12 +638,11 @@ begin
 		EXMEM_preg_addr_bits <= 2'b0;
 	end
 
-	else if(stall_EX || csr_ex_flush)
-	begin
+    else if(csr_ex_flush)
+    begin
         EXMEM_preg_wb <= 9'h0c;
         EXMEM_preg_mem <= 3'b1;
         EXMEM_preg_csr_addr <= 12'b0;
-        //{EXMEM_preg_pc, EXMEM_preg_aluout, EXMEM_preg_fpuout, EXMEM_preg_data2} <= 128'b0; //EXMEM_preg_data2 is unused
         {EXMEM_preg_pc, EXMEM_preg_aluout} <= 64'b0;
         EXMEM_preg_instr <= 32'b0;
         EXMEM_preg_memin <= 32'b0;
@@ -646,7 +652,29 @@ begin
         EXMEM_preg_mret <= 1'b0;
         EXMEM_preg_misaligned <= 1'b0;
         EXMEM_preg_addr_bits <= 2'b0;
-	end
+    end
+
+    else if(data_stall_i)
+    begin
+        // HOLD EX/MEM exactly as-is while data memory is stalled
+        // no assignments
+    end
+
+    else if(muldiv_stall_EX)
+    begin
+        EXMEM_preg_wb <= 9'h0c;
+        EXMEM_preg_mem <= 3'b1;
+        EXMEM_preg_csr_addr <= 12'b0;
+        {EXMEM_preg_pc, EXMEM_preg_aluout} <= 64'b0;
+        EXMEM_preg_instr <= 32'b0;
+        EXMEM_preg_memin <= 32'b0;
+        EXMEM_preg_rd <= 5'b0;
+        EXMEM_preg_imm <= 32'b0;
+        EXMEM_preg_dummy <= 1'b1;
+        EXMEM_preg_mret <= 1'b0;
+        EXMEM_preg_misaligned <= 1'b0;
+        EXMEM_preg_addr_bits <= 2'b0;
+    end
 
 	else
 	begin
