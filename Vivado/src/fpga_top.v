@@ -15,7 +15,7 @@ module fpga_top(
 );
 
 parameter SYS_CLK_FREQ = 40000000;
-parameter MEMORY_INIT  = "memory_init.mem";
+parameter MEMORY_INIT  = "instruction.mem";
 parameter RAM_DEPTH    = 16384;
 parameter reset_vector = 32'h0000_0000;
 
@@ -79,15 +79,9 @@ wire                     data_axi_rready;
 wire [AXIL_DATA_W-1:0]   data_axi_rdata;
 wire [1:0]               data_axi_rresp;
 
-wire                     instr_axi_arvalid;
-wire                     instr_axi_arready;
-wire [AXIL_ADDR_W-1:0]   instr_axi_araddr;
-wire [2:0]               instr_axi_arprot;
-
-wire                     instr_axi_rvalid;
-wire                     instr_axi_rready;
-wire [AXIL_DATA_W-1:0]   instr_axi_rdata;
-wire [1:0]               instr_axi_rresp;
+// Instruction port signals
+wire [AXIL_ADDR_W-1:0]   instr_araddr;
+wire [AXIL_DATA_W-1:0]   instr_rdata;
 
 wire irq_ack_o;
 
@@ -148,15 +142,8 @@ core_axi #(
     .data_axi_rresp_i  (data_axi_rresp),
 
     // AXI4-Lite instruction port
-    .instr_axi_arvalid_o(instr_axi_arvalid),
-    .instr_axi_arready_i(instr_axi_arready),
-    .instr_axi_araddr_o (instr_axi_araddr),
-    .instr_axi_arprot_o (instr_axi_arprot),
-
-    .instr_axi_rvalid_i (instr_axi_rvalid),
-    .instr_axi_rready_o (instr_axi_rready),
-    .instr_axi_rdata_i  (instr_axi_rdata),
-    .instr_axi_rresp_i  (instr_axi_rresp),
+    .instr_araddr_o(instr_araddr),
+    .instr_rdata_i(instr_rdata),
 
     // Interrupts
     .meip_i(1'b0),
@@ -363,35 +350,15 @@ axi4l_ram #(
     .AXIL_ADDR_W(AXIL_ADDR_W),
     .STRB_W(AXIL_STRB_W),
     .ADDR_W(RAM_ADDR_W),
-    .PIPELINE_OUTPUT(0)
+    .PIPELINE_OUTPUT(0),
+    .MEMORY_INIT_FILE(MEMORY_INIT)
 ) memory (
     // Port A - instruction
     .a_clk(clk_i),
     .a_rst(~rst_ni),
 
-    .s_axil_a_awaddr ({AXIL_ADDR_W{1'b0}}),
-    .s_axil_a_awprot (3'b000),
-    .s_axil_a_awvalid(1'b0),
-    .s_axil_a_awready(),
-
-    .s_axil_a_wdata  ({AXIL_DATA_W{1'b0}}),
-    .s_axil_a_wstrb  ({AXIL_STRB_W{1'b0}}),
-    .s_axil_a_wvalid (1'b0),
-    .s_axil_a_wready (),
-
-    .s_axil_a_bresp  (),
-    .s_axil_a_bvalid (),
-    .s_axil_a_bready (1'b0),
-
-    .s_axil_a_araddr (instr_axi_araddr),
-    .s_axil_a_arprot (instr_axi_arprot),
-    .s_axil_a_arvalid(instr_axi_arvalid),
-    .s_axil_a_arready(instr_axi_arready),
-
-    .s_axil_a_rdata  (instr_axi_rdata),
-    .s_axil_a_rresp  (instr_axi_rresp),
-    .s_axil_a_rvalid (instr_axi_rvalid),
-    .s_axil_a_rready (instr_axi_rready),
+    .s_axil_a_araddr (instr_araddr),
+    .s_axil_a_rdata  (instr_rdata),
 
     // Port B - data RAM only
     .b_clk(clk_i),
