@@ -72,11 +72,35 @@ void uart_put_uint32(uint32_t num) {
     }
 }
 
-// Cycle Counting 
-static inline uint32_t get_cycles(void) {
-    uint32_t cycles;
-    __asm__ volatile ("csrr %0, mcycle" : "=r" (cycles));
-    return cycles;
+// New 64-bit print helper for cycle counts
+void uart_put_uint64(uint64_t num) {
+    if (num == 0) {
+        uart_putchar('0');
+        return;
+    }
+    char buf[22];
+    int i = 0;
+    while (num > 0) {
+        buf[i++] = (num % 10) + '0';
+        num /= 10;
+    }
+    while (i > 0) {
+        uart_putchar(buf[--i]);
+    }
+}
+
+// 64-bit Cycle Counting for RV32
+static inline uint64_t read_cycle64(void)
+{
+    uint32_t hi0, lo, hi1;
+
+    do {
+        __asm__ volatile ("rdcycleh %0" : "=r"(hi0));
+        __asm__ volatile ("rdcycle  %0" : "=r"(lo));
+        __asm__ volatile ("rdcycleh %0" : "=r"(hi1));
+    } while (hi0 != hi1);
+
+    return ((uint64_t)hi0 << 32) | lo;
 }
 
 // Kyber Tests
@@ -88,30 +112,30 @@ static int test_keys(void)
     uint8_t key_a[CRYPTO_BYTES];
     uint8_t key_b[CRYPTO_BYTES];
     
-    uint32_t start_cycles, end_cycles;
+    uint64_t start_cycles, end_cycles;
 
     uart_puts("Generating keypair...\r\n");
-    start_cycles = get_cycles();
+    start_cycles = read_cycle64();
     crypto_kem_keypair(pk, sk);
-    end_cycles = get_cycles();
+    end_cycles = read_cycle64();
     uart_puts("-> Cycles: ");
-    uart_put_uint32(end_cycles - start_cycles);
+    uart_put_uint64(end_cycles - start_cycles);
     uart_puts("\r\n");
 
     uart_puts("Encapsulating secret...\r\n");
-    start_cycles = get_cycles();
+    start_cycles = read_cycle64();
     crypto_kem_enc(ct, key_b, pk);
-    end_cycles = get_cycles();
+    end_cycles = read_cycle64();
     uart_puts("-> Cycles: ");
-    uart_put_uint32(end_cycles - start_cycles);
+    uart_put_uint64(end_cycles - start_cycles);
     uart_puts("\r\n");
 
     uart_puts("Decapsulating secret...\r\n");
-    start_cycles = get_cycles();
+    start_cycles = read_cycle64();
     crypto_kem_dec(key_a, ct, sk);
-    end_cycles = get_cycles();
+    end_cycles = read_cycle64();
     uart_puts("-> Cycles: ");
-    uart_put_uint32(end_cycles - start_cycles);
+    uart_put_uint64(end_cycles - start_cycles);
     uart_puts("\r\n");
 
     // Standard bare-metal loop to avoid memcmp libc traps
