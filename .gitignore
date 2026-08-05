@@ -90,3 +90,9 @@ fpga_top/*.data
 .Xil/
 **/.Xil/
 .cache/
+
+# Test Outputs
+*.elf
+*.bin
+*.mem
+*.data

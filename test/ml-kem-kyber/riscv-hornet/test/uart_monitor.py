@@ -1,0 +1,56 @@
+import serial
+import sys
+import time
+
+# User configs
+PORT = '/dev/ttyUSB0'
+BAUD_RATE = 115200
+
+def run_kyber_test():
+    try:
+        print(f"Opening {PORT} at {BAUD_RATE} baud...")
+        ser = serial.Serial(PORT, BAUD_RATE, timeout=1.0)
+        
+        # CLEAR the buffer in case old junk is in there
+        ser.reset_input_buffer()
+        
+        print("Waiting for FPGA to initialize...")
+        print("⚠️  IMPORTANT: Press the physical RESET button on your FPGA board now! ⚠️")
+        
+        while True:
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if line:
+                print(f"FPGA: {line}")
+            
+            # Use 'in' just in case there are hidden whitespace characters
+            if "Waiting for trigger" in line:
+                break
+                
+        print("\nTriggering Kyber test on FPGA...")
+        ser.write(b'c')
+        
+        print("\n--- Test Output ---")
+        while True:
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if line:
+                print(line)
+                
+            if "ALL TESTS PASSED" in line or "TEST FAILED" in line:
+                while True:
+                    extra_line = ser.readline().decode('utf-8', errors='ignore').strip()
+                    if not extra_line: 
+                        break
+                    print(extra_line)
+                break
+                
+    except serial.SerialException as e:
+        print(f"Serial Error: {e}")
+    except KeyboardInterrupt:
+        print("\nHost script terminated by user.")
+    finally:
+        if 'ser' in locals() and ser.is_open:
+            ser.close()
+            print("\nSerial connection closed.")
+
+if __name__ == "__main__":
+    run_kyber_test()
