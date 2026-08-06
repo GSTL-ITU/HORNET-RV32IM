@@ -23,21 +23,21 @@ build: sim fpga_O0 fpga_O3
 # Simulation Target (O3)
 sim:
 	$(CC32)-gcc hornet_dilithium.c $(DILITHIUM_SRC) $(DRIVER_SRC) $(STARTUP_SRC) $(CCFLAGS) -O3 -o $(TARGET_SIM).elf
-	$(CC32)-objcopy -O binary -j .init -j .text -j .rodata -j .sdata $(TARGET_SIM).elf $(TARGET_SIM).bin
+	$(CC32)-objcopy -O binary -j .init -j .text -j .rodata $(TARGET_SIM).elf $(TARGET_SIM).bin
 	$(ROM_GEN) $(TARGET_SIM).bin
 	cp $(TARGET_SIM).data memory_init_tb.mem
 
 # FPGA Target (O0)
 fpga_O0:
 	$(CC32)-gcc hornet_dilithium_fpga.c $(DILITHIUM_SRC) $(DRIVER_SRC) $(STARTUP_SRC) $(CCFLAGS) -O0 -o $(TARGET_FPGA_O0).elf
-	$(CC32)-objcopy -O binary -j .init -j .text -j .rodata -j .sdata $(TARGET_FPGA_O0).elf $(TARGET_FPGA_O0).bin
+	$(CC32)-objcopy -O binary -j .init -j .text -j .rodata $(TARGET_FPGA_O0).elf $(TARGET_FPGA_O0).bin
 	$(ROM_GEN) $(TARGET_FPGA_O0).bin
 	cp $(TARGET_FPGA_O0).data $(TARGET_FPGA_O0).mem
 
 # FPGA Target (O3)
 fpga_O3:
 	$(CC32)-gcc hornet_dilithium_fpga.c $(DILITHIUM_SRC) $(DRIVER_SRC) $(STARTUP_SRC) $(CCFLAGS) -O3 -o $(TARGET_FPGA_O3).elf
-	$(CC32)-objcopy -O binary -j .init -j .text -j .rodata -j .sdata $(TARGET_FPGA_O3).elf $(TARGET_FPGA_O3).bin
+	$(CC32)-objcopy -O binary -j .init -j .text -j .rodata $(TARGET_FPGA_O3).elf $(TARGET_FPGA_O3).bin
 	$(ROM_GEN) $(TARGET_FPGA_O3).bin
 	cp $(TARGET_FPGA_O3).data $(TARGET_FPGA_O3).mem
 

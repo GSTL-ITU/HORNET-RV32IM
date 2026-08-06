@@ -17,7 +17,7 @@ The cryptographic source code in this repository is adapted from the official Ky
 The codebase has been modified to support deterministic testing in bare-metal simulation and FPGA environments. OS-dependent entropy sources (`/dev/urandom`) and standard C library I/O dependencies (`stdio.h`, `printf`) have been stripped and replaced with custom bare-metal MMIO UART debugging and a deterministic SHAKE256 PRNG.
 
 ## Repository Structure
-
+```
 .
 ├── avx2/             # Native x86 AVX2 implementation (Ignored for bare-metal/FPGA)
 ├── ref/              # Standard C reference implementation
@@ -32,7 +32,7 @@ The codebase has been modified to support deterministic testing in bare-metal si
     │   └── verilator.sh          # Simulation script targeting barebones_top_tb
     ├── randombytes.c             # Custom bare-metal deterministic SHAKE256 PRNG
     └── [Core Kyber Source]       # indcpa, ntt, poly, kem, fips202 (unmodified where possible)
-
+```
 ## Current Status: Simulation & FPGA Testing
 
 Testing is currently conducted in two phases:
@@ -43,16 +43,13 @@ Testing is currently conducted in two phases:
 
 Clock cycles for cryptographic operations are measured directly on the hardware using the standard 64-bit RISC-V `mcycle` and `mcycleh` Control and Status Registers (CSRs).
 
-**Current FPGA Execution Metrics (Target: Kyber KEM):**
-* **Keypair Generation:** 1,628,037 cycles
-* **Encapsulation:** 1,876,904 cycles
-* **Decapsulation:** 2,197,007 cycles
+It was tested on Nexys Video with 25 MHz Hornet using UART and `pyserial`.
 
-### Simulation Cycle Calculation
-
-For Verilator simulation, the testbench (`barebones_top_tb.v`) drives the clock with a half-period toggle delay of `#12.5` ns. This yields a full clock period of **25 ns**, corresponding to a hardware frequency of **40 MHz**. Total cycles in simulation can be derived via:
-
-$$\text{Clock Cycles} = \frac{\text{Total Simulation Time (ns)}}{25 \text{ ns}}$$
+| Operation | O0 Optimization (Cycles) | O3 Optimization (Cycles) |
+| :--- | :--- | :--- |
+| **Keypair Generation** | 4,916,388 | 1,628,037 |
+| **Encapsulation** | 5,757,020 | 1,876,904 |
+| **Decapsulation** | 6,791,572 | 2,197,007 |
 
 ## Profiling
 

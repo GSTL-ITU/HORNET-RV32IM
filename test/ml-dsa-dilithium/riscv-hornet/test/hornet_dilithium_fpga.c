@@ -22,7 +22,7 @@ void uart_putchar(char c) {
     uart_transmit_byte(&uart0, (uint8_t)c);
 }
 
-// Interrupt-driven getchar relying on your fast_irq0 setup
+// Interrupt-driven getchar
 volatile char rx_char = 0;
 volatile int rx_ready = 0;
 
@@ -31,6 +31,10 @@ void fast_irq0_handler() {
     char *rx_ptr = (char*)(uart0.base_addr) + UART_RX_ADDR_OFFSET;
     rx_char = *rx_ptr;
     rx_ready = 1;
+
+    // Disable interrupts INSIDE the ISR
+    DISABLE_FAST_IRQ(0);
+    DISABLE_GLOBAL_IRQ();
 }
 
 char uart_getchar() {
@@ -45,15 +49,14 @@ char uart_getchar() {
         __asm__ volatile ("nop");
     }
     
-    // Disable interrupts again so execution isn't preempted
-    DISABLE_FAST_IRQ(0);
-    DISABLE_GLOBAL_IRQ();
-    
     return rx_char;
 }
 
+// Rewritten without strlen() to avoid bare-metal libc traps
 void uart_puts(const char* str) {
-    uart_transmit_string(&uart0, str, strlen(str));
+    while (*str) {
+        uart_putchar(*str++);
+    }
 }
 
 void uart_put_uint32(uint32_t num) {
@@ -72,11 +75,35 @@ void uart_put_uint32(uint32_t num) {
     }
 }
 
-// Cycle Counting
-static inline uint32_t get_cycles(void) {
-    uint32_t cycles;
-    __asm__ volatile ("csrr %0, mcycle" : "=r" (cycles));
-    return cycles;
+// New 64-bit print helper for cycle counts
+void uart_put_uint64(uint64_t num) {
+    if (num == 0) {
+        uart_putchar('0');
+        return;
+    }
+    char buf[22];
+    int i = 0;
+    while (num > 0) {
+        buf[i++] = (num % 10) + '0';
+        num /= 10;
+    }
+    while (i > 0) {
+        uart_putchar(buf[--i]);
+    }
+}
+
+// 64-bit Cycle Counting for RV32
+static inline uint64_t read_cycle64(void)
+{
+    uint32_t hi0, lo, hi1;
+
+    do {
+        __asm__ volatile ("rdcycleh %0" : "=r"(hi0));
+        __asm__ volatile ("rdcycle  %0" : "=r"(lo));
+        __asm__ volatile ("rdcycleh %0" : "=r"(hi1));
+    } while (hi0 != hi1);
+
+    return ((uint64_t)hi0 << 32) | lo;
 }
 
 // Dilithium Tests
@@ -93,32 +120,32 @@ static int test_dilithium(void)
     uint8_t pk[CRYPTO_PUBLICKEYBYTES];
     uint8_t sk[CRYPTO_SECRETKEYBYTES];
     
-    uint32_t start_cycles, end_cycles;
+    uint64_t start_cycles, end_cycles;
 
     randombytes(m, MLEN);
 
     uart_puts("Generating keypair...\r\n");
-    start_cycles = get_cycles();
+    start_cycles = read_cycle64();
     crypto_sign_keypair(pk, sk);
-    end_cycles = get_cycles();
+    end_cycles = read_cycle64();
     uart_puts("-> Cycles: ");
-    uart_put_uint32(end_cycles - start_cycles);
+    uart_put_uint64(end_cycles - start_cycles);
     uart_puts("\r\n");
 
     uart_puts("Signing message...\r\n");
-    start_cycles = get_cycles();
+    start_cycles = read_cycle64();
     crypto_sign(sm, &smlen, m, MLEN, ctx, CTXLEN, sk);
-    end_cycles = get_cycles();
+    end_cycles = read_cycle64();
     uart_puts("-> Cycles: ");
-    uart_put_uint32(end_cycles - start_cycles);
+    uart_put_uint64(end_cycles - start_cycles);
     uart_puts("\r\n");
 
     uart_puts("Verifying signature...\r\n");
-    start_cycles = get_cycles();
+    start_cycles = read_cycle64();
     ret = crypto_sign_open(m2, &mlen, sm, smlen, ctx, CTXLEN, pk);
-    end_cycles = get_cycles();
+    end_cycles = read_cycle64();
     uart_puts("-> Cycles: ");
-    uart_put_uint32(end_cycles - start_cycles);
+    uart_put_uint64(end_cycles - start_cycles);
     uart_puts("\r\n");
 
     if(ret) {

@@ -29,7 +29,7 @@ void fast_irq0_handler() {
     rx_char = *rx_ptr;
     rx_ready = 1;
     
-    // Disable interrupts INSIDE the ISR, exactly like the working MLP example
+    // Disable interrupts INSIDE the ISR
     DISABLE_FAST_IRQ(0);
     DISABLE_GLOBAL_IRQ();
 }
