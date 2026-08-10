@@ -30,6 +30,12 @@ The codebase has been modified to support deterministic testing in a bare-metal 
 ```
 ## Current Status & Simulation
 
+| Operation | O0 Optimization (Cycles) | O3 Optimization (Cycles) |
+| :--- | :--- | :--- |
+| **Keypair Generation** | 807,708,626 | 163,514,576 |
+| **Signing** | 339,688,097 | 65,339,248 |
+| **Verifying** | 2,450,860 | 592,241 |
+
 Initial porting efforts are focused on verifying the mathematical correctness of the FPU emulation on the Hornet core via simulation. 
 
 Currently, the repository includes the `sw_keygen_test`, which successfully validates the `falcon_keygen_make` function. A detailed execution report and cycle analysis from the **Cadence Xcelium** simulation can be found in the test's dedicated documentation: 

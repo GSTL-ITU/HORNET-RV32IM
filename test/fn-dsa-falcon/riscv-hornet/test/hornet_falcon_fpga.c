@@ -12,6 +12,13 @@
 #define NTESTS 1
 #define LOGN 9 // FN-512
 
+// Compile-time macro to find the largest temporary buffer size required
+#define MAX2(a, b) ((a) > (b) ? (a) : (b))
+#define MAX3(a, b, c) MAX2(MAX2(a, b), c)
+#define FALCON_MAX_TMP_SIZE MAX3(FALCON_TMPSIZE_KEYGEN(LOGN), \
+                                 FALCON_TMPSIZE_SIGNDYN(LOGN), \
+                                 FALCON_TMPSIZE_VERIFY(LOGN))
+
 // Global UART instance
 uart uart0;
 
@@ -51,7 +58,6 @@ char uart_getchar() {
 }
 
 void uart_puts(const char* str) {
-    // We can use your driver's string transmit function directly
     while (*str) {
         uart_putchar(*str++);
     }
@@ -73,7 +79,7 @@ void uart_put_uint32(uint32_t num) {
     }
 }
 
-// New 64-bit print helper for cycle counts
+// 64-bit print helper for cycle counts
 void uart_put_uint64(uint64_t num) {
     if (num == 0) {
         uart_putchar('0');
@@ -104,41 +110,98 @@ static inline uint64_t read_cycle64(void)
     return ((uint64_t)hi0 << 32) | lo;
 }
 
-// Falcon Tests
+// Falcon Core Test
 static int test_falcon(void)
 {
-    // Deterministic PRNG
+    int ret;
+    uint64_t start_cycles, end_cycles;
+
+    // Initialize PRNG 
     shake256_context rng;
     shake256_init_prng_from_system(&rng); 
 
-    // Allocate memory sizes
-    size_t tmp_size = FALCON_TMPSIZE_KEYGEN(LOGN);
-    if (FALCON_TMPSIZE_SIGNDYN(LOGN) > tmp_size) {
-        tmp_size = FALCON_TMPSIZE_SIGNDYN(LOGN);
+    static __attribute__((aligned(8))) uint8_t tmp[FALCON_MAX_TMP_SIZE]; 
+    
+    // Key buffers
+    static uint8_t privkey[FALCON_PRIVKEY_SIZE(LOGN)];
+    static uint8_t pubkey[FALCON_PUBKEY_SIZE(LOGN)];
+    
+    // Message and Signature buffers
+    uint8_t msg[] = "Falcon Hardware-in-the-Loop Test on Hornet";
+    size_t msg_len = sizeof(msg);
+    static uint8_t sig[FALCON_SIG_COMPRESSED_MAXSIZE(LOGN)];
+    size_t sig_len = sizeof(sig);
+
+    // --- KEYGEN ---
+    uart_puts("Generating keypair...\r\n");
+    start_cycles = read_cycle64();
+    ret = falcon_keygen_make(&rng, LOGN, 
+                             privkey, sizeof(privkey), 
+                             pubkey, sizeof(pubkey), 
+                             tmp, sizeof(tmp));
+    end_cycles = read_cycle64();
+    
+    if (ret != 0) {
+        uart_puts("ERROR: Keypair generation failed\r\n");
+        return -1;
     }
     
-    // Force 8-byte alignment for RISC-V floating-point emulation buffers
-    __attribute__((aligned(8))) uint8_t tmp[tmp_size];
-    uint8_t privkey[FALCON_PRIVKEY_SIZE(LOGN)];
-    uint8_t pubkey[FALCON_PUBKEY_SIZE(LOGN)];
-    
-    uint64_t start_cycles, end_cycles;
-
-    uart_puts("Generating keypair (FN-512)...\r\n");
-    start_cycles = read_cycle64();
-    int result = falcon_keygen_make(&rng, LOGN, privkey, sizeof(privkey), 
-                                    pubkey, sizeof(pubkey), tmp, tmp_size);
-    end_cycles = read_cycle64();
-    uart_puts("-> Cycles: ");
+    uart_puts(" -> Cycles: ");
     uart_put_uint64(end_cycles - start_cycles);
     uart_puts("\r\n");
 
-    if (result != 0) {
-        uart_puts("ERROR: Key generation failed!\r\n");
-        return 1;
+    // --- SIGN ---
+    uart_puts("Signing message...\r\n");
+    sig_len = sizeof(sig); // Reset sig_len in case NTESTS > 1
+    start_cycles = read_cycle64();
+    ret = falcon_sign_dyn(&rng, sig, &sig_len, FALCON_SIG_COMPRESSED, 
+                          privkey, sizeof(privkey), 
+                          msg, msg_len, 
+                          tmp, sizeof(tmp));
+    end_cycles = read_cycle64();
+    
+    if (ret != 0) {
+        uart_puts("ERROR: Signature generation failed\r\n");
+        return -1;
     }
 
-    uart_puts("Keypair generated successfully.\r\n");
+    uart_puts(" -> Cycles: ");
+    uart_put_uint64(end_cycles - start_cycles);
+    uart_puts("\r\n");
+    
+    // --- VERIFY ---
+    uart_puts("Verifying message...\r\n");
+    start_cycles = read_cycle64();
+    ret = falcon_verify(sig, sig_len, FALCON_SIG_COMPRESSED, 
+                        pubkey, sizeof(pubkey), 
+                        msg, msg_len, 
+                        tmp, sizeof(tmp));
+    end_cycles = read_cycle64();
+
+    if(ret != 0) {
+        uart_puts("ERROR: Verification failed\r\n");
+        return -1;
+    }
+    
+    uart_puts(" -> Cycles: ");
+    uart_put_uint64(end_cycles - start_cycles);
+    uart_puts("\r\n");
+    uart_puts("Signature valid and messages match.\r\n");
+
+    // --- FORGERY TEST ---
+    uart_puts("Testing trivial forgeries...\r\n");
+    sig[0] ^= 1; // Flip a bit in the signature
+    ret = falcon_verify(sig, sig_len, FALCON_SIG_COMPRESSED, 
+                        pubkey, sizeof(pubkey), 
+                        msg, msg_len, 
+                        tmp, sizeof(tmp));
+    
+    if(ret == 0) {
+        uart_puts("ERROR: Trivial forgeries possible\r\n");
+        return -1;
+    }
+    uart_puts("Forged signatures rejected correctly.\r\n");
+
     return 0;
 }
 
@@ -173,7 +236,7 @@ int main(void) {
         }
     }
 
-    uart_puts("ALL TESTS PASSED\r\n");
+    uart_puts("\r\nALL TESTS PASSED\r\n");
 
     uart_puts("FALCON_PRIVKEY_SIZE = ");
     uart_put_uint32(FALCON_PRIVKEY_SIZE(LOGN));
